@@ -442,13 +442,10 @@ class PoseDetector(object):
         heatmaps = heatmaps_sum / len(scales)
 
         if self.device >= 0:
+            pafs = pafs.get()
             cuda.get_device_from_id(self.device).synchronize()
 
         print('forward: {:.2f}'.format(time.time() - st))
-        st = time.time()
-
-        if self.device >= 0:
-            pafs = pafs.get()
 
         all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
         if len(all_peaks) == 0:
@@ -458,7 +455,6 @@ class PoseDetector(object):
         all_peaks[:, 1] *= orig_img_w / resized_output_img_w
         all_peaks[:, 2] *= orig_img_h / resized_output_img_h
         person_pose_array = self.subsets_to_person_pose_array(subsets, all_peaks)
-        print('parsing: {:.2f}'.format(time.time() - st))
         return person_pose_array
 
 
@@ -507,6 +503,7 @@ if __name__ == '__main__':
 
     # load model
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu)
+
     while True:
         # read image
         img = cv2.imread(args.img)
@@ -516,7 +513,7 @@ if __name__ == '__main__':
         person_pose_array = pose_detector(img)
         print('inference: {:.2f}'.format(time.time() - st))
 
-    # draw and save image
-    img = draw_person_pose(img, person_pose_array)
-    print('Saving result into result.png...')
-    cv2.imwrite('result.png', img)
+        # draw and save image
+        img = draw_person_pose(img, person_pose_array)
+        print('Saving result into result.png...')
+        cv2.imwrite('result.png', img)
