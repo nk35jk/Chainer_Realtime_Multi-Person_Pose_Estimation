@@ -2,6 +2,7 @@ from enum import IntEnum
 
 from models.CocoPoseNet import CocoPoseNet
 from models.nn1 import NN1
+from models.resnet50 import ResNet50
 
 from models.FaceNet import FaceNet
 from models.HandNet import HandNet
@@ -53,13 +54,14 @@ params = {
         'facenet': FaceNet,
         'handnet': HandNet,
         'nn1': NN1,
+        'resnet50': ResNet50,
     },
     'paf_sigma': 11,
     'heatmap_sigma': 15,
     'crop_iob_thresh': 0.4,
     'crop_size': 480,
     'input_size': 368,
-    'downscale': 8,
+    'downscale': 4,
 
     'inference_img_size': 368,
     #'inference_scales': [0.5, 1.0, 1.5],

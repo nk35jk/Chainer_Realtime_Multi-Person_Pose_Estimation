@@ -22,6 +22,7 @@ from pose_detector import PoseDetector, draw_person_pose
 
 from models import CocoPoseNet
 from models import nn1
+from models import resnet50
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t, ignore_mask):
@@ -221,6 +222,8 @@ if __name__ == '__main__':
         CocoPoseNet.copy_vgg_params(model)
     elif args.arch == 'nn1':
         nn1.copy_squeezenet_params(model.squeeze)
+    elif args.arch == 'resnet50':
+        chainer.serializers.load_npz('models/resnet50.npz', model.res)
 
     if args.initmodel:
         print('Load model from', args.initmodel)
