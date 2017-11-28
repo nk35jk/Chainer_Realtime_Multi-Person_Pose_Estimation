@@ -266,7 +266,7 @@ class PoseDetector(object):
         base_limbs_len = limbs_len[[14, 3, 0, 13, 9]] # (鼻首、首左腰、首右腰、肩左耳、肩右耳)の長さの比率(このどれかが存在すればこれを優先的に単位長さの計算する)
         non_zero_limbs_len = base_limbs_len > 0
         if len(np.nonzero(non_zero_limbs_len)[0]) > 0:
-            limbs_len_ratio = np.array([0.85, 2.2, 2.2, 0.85, 0.85]) 
+            limbs_len_ratio = np.array([0.85, 2.2, 2.2, 0.85, 0.85])
             unit_length = np.sum(base_limbs_len[non_zero_limbs_len] / limbs_len_ratio[non_zero_limbs_len]) / len(np.nonzero(non_zero_limbs_len)[0])
         else:
             limbs_len_ratio = np.array([2.2, 1.7, 1.7, 2.2, 1.7, 1.7, 0.6, 0.93, 0.65, 0.85, 0.6, 0.93, 0.65, 0.85, 1, 0.2, 0.2, 0.25, 0.25])
@@ -324,7 +324,7 @@ class PoseDetector(object):
                     right_pos = joint[0]
                     right_joint_index = i
 
-        top_padding_radio = [0.9, 1.9, 1.9, 2.9, 3.7, 1.9, 2.9, 3.7, 4.0, 5.5, 7.0, 4.0, 5.5, 7.0, 0.7, 0.8, 0.7, 0.8] 
+        top_padding_radio = [0.9, 1.9, 1.9, 2.9, 3.7, 1.9, 2.9, 3.7, 4.0, 5.5, 7.0, 4.0, 5.5, 7.0, 0.7, 0.8, 0.7, 0.8]
         bottom_padding_radio = [6.9, 5.9, 5.9, 4.9, 4.1, 5.9, 4.9, 4.1, 3.8, 2.3, 0.8, 3.8, 2.3, 0.8, 7.1, 7.0, 7.1, 7.0]
 
         left = (left_pos - 0.3 * unit_length).astype(int)
@@ -412,6 +412,7 @@ class PoseDetector(object):
         return padded_img
 
     def __call__(self, orig_img, fast_mode=False):
+        st = time.time()
         orig_img_h, orig_img_w, _ = orig_img.shape
 
         resized_output_img_w, resized_output_img_h = self.compute_optimal_size(orig_img, params['heatmap_size'])
@@ -442,6 +443,10 @@ class PoseDetector(object):
 
         if self.device >= 0:
             pafs = pafs.get()
+            self.device.synchronize()
+
+        print('forward: {:.2f}'.format(time.time() - st))
+        st = time.time()
 
         all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
         if len(all_peaks) == 0:
@@ -451,6 +456,7 @@ class PoseDetector(object):
         all_peaks[:, 1] *= orig_img_w / resized_output_img_w
         all_peaks[:, 2] *= orig_img_h / resized_output_img_h
         person_pose_array = self.subsets_to_person_pose_array(subsets, all_peaks)
+        print('parsing: {:.2f}'.format(time.time() - st))
         return person_pose_array
 
 
@@ -499,12 +505,12 @@ if __name__ == '__main__':
 
     # load model
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu)
+    while True:
+        # read image
+        img = cv2.imread(args.img)
 
-    # read image
-    img = cv2.imread(args.img)
-
-    # inference
-    person_pose_array = pose_detector(img)
+        # inference
+        person_pose_array = pose_detector(img)
 
     # draw and save image
     img = draw_person_pose(img, person_pose_array)
