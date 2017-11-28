@@ -507,11 +507,11 @@ if __name__ == '__main__':
     # load model
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu)
     while True:
-        st = time.time()
         # read image
         img = cv2.imread(args.img)
 
         # inference
+        st = time.time()
         person_pose_array = pose_detector(img)
         print('inference: {:.2f}'.format(time.time() - st))
 
