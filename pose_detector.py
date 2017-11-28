@@ -443,7 +443,7 @@ class PoseDetector(object):
 
         if self.device >= 0:
             pafs = pafs.get()
-            self.device.synchronize()
+            cuda.get_device_from_id(self.device).synchronize()
 
         print('forward: {:.2f}'.format(time.time() - st))
         st = time.time()
