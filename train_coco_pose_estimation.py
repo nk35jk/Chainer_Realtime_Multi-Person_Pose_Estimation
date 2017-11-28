@@ -265,8 +265,8 @@ if __name__ == '__main__':
 
     trainer.extend(Validator(val_iter, model, device=args.gpu),
                    trigger=val_interval)
-    trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
-                   trigger=val_interval)
+    # trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
+    #                trigger=val_interval)
     # trainer.extend(extensions.dump_graph('main/loss'))
     trainer.extend(extensions.snapshot(), trigger=val_interval)
     trainer.extend(extensions.snapshot_object(

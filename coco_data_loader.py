@@ -378,9 +378,14 @@ class CocoDataLoader(DatasetMixin):
         if self.mode != 'eval':
             img, ignore_mask, joints, valid_joints = self.augment_data(img, ignore_mask, joints, valid_joints, joint_bboxes, crop_size)
         resized_img, resized_mask, resized_joints = self.resize_data(img, ignore_mask, joints, resize_shape=(input_size, input_size))
+
+        resized_heatmaps = self.compute_heatmaps(resized_img, resized_joints, valid_joints, heatmap_sigma)
+        resized_pafs = self.compute_pafs(resized_img, resized_joints, valid_joints, paf_sigma)
+
         downscaled_img, downscaled_mask, downscaled_joints = self.resize_data(img, ignore_mask, joints, resize_shape=(downscaled_size, downscaled_size))
-        downscaled_heatmaps = self.compute_heatmaps(downscaled_img, downscaled_joints, valid_joints, heatmap_sigma)
-        downscaled_pafs = self.compute_pafs(downscaled_img, downscaled_joints, valid_joints, paf_sigma)
+
+        downscaled_pafs = cv2.resize(resized_pafs.transpose(1, 2, 0), (downscaled_size, downscaled_size)).transpose(2, 0, 1)
+        downscaled_heatmaps = cv2.resize(resized_heatmaps.transpose(1, 2, 0), (downscaled_size, downscaled_size)).transpose(2, 0, 1)
         return resized_img, downscaled_pafs, downscaled_heatmaps, downscaled_mask
 
     def get_img_annotation(self, ind=None, img_id=None):
@@ -443,15 +448,7 @@ if __name__ == '__main__':
     for i in range(len(data_loader)):
         img, annotations, ignore_mask, img_id = data_loader.get_img_annotation(ind=i)
         if annotations is not None:
-            joints, valid_joints, joint_bboxes, _ = data_loader.parse_coco_annotation(img, annotations)
-            augmented_img, augmented_mask, joints, valid_joints = data_loader.augment_data(img, ignore_mask, joints, valid_joints, joint_bboxes, min_crop_size=480)
-
-            resized_img, resized_mask, resized_joints = data_loader.resize_data(augmented_img, augmented_mask, joints, resize_shape=(368, 368))
-            downscaled_img, downscaled_mask, downscaled_joints = data_loader.resize_data(augmented_img, augmented_mask, joints, resize_shape=(46, 46))
-
-            # compute pafs and heatmaps
-            downscaled_pafs = data_loader.compute_pafs(downscaled_img, downscaled_joints, valid_joints, params['paf_sigma'])
-            downscaled_heatmaps = data_loader.compute_heatmaps(downscaled_img, downscaled_joints, valid_joints, params['heatmap_sigma'])
+            resized_img, downscaled_pafs, downscaled_heatmaps, downscaled_mask = data_loader.get_sample(img, annotations, ignore_mask)
 
             # resize to view
             pafs = cv2.resize(downscaled_pafs.transpose(1, 2, 0), (368, 368)).transpose(2, 0, 1)
@@ -460,8 +457,8 @@ if __name__ == '__main__':
 
             # view
             img = resized_img.copy()
-            img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
             img = data_loader.overlay_pafs(img, pafs)
+            img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
             img = data_loader.overlay_ignore_mask(img, ignore_mask)
 
             cv2.imshow('w', np.hstack((resized_img, img)))
