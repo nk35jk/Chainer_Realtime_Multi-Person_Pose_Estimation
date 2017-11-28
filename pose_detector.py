@@ -441,12 +441,13 @@ class PoseDetector(object):
         pafs = pafs_sum / len(scales)
         heatmaps = heatmaps_sum / len(scales)
 
+        cuda.get_device_from_id(self.device).synchronize()
+        print('forward: {:.2f}'.format(time.time() - st))
+        st = time.time()
+
         if self.device >= 0:
             pafs = pafs.get()
             cuda.get_device_from_id(self.device).synchronize()
-
-        print('forward: {:.2f}'.format(time.time() - st))
-        st = time.time()
 
         all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
         if len(all_peaks) == 0:
