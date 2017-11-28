@@ -1,8 +1,11 @@
 from enum import IntEnum
 
 from models.CocoPoseNet import CocoPoseNet
+from models.nn1 import NN1
+
 from models.FaceNet import FaceNet
 from models.HandNet import HandNet
+
 
 class JointType(IntEnum):
     """関節の種類を表す """
@@ -49,6 +52,7 @@ params = {
         'posenet': CocoPoseNet,
         'facenet': FaceNet,
         'handnet': HandNet,
+        'nn1': NN1,
     },
     'paf_sigma': 1.3,
     'heatmap_sigma': 1.5,

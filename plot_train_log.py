@@ -1,6 +1,8 @@
 import os
 import argparse
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
@@ -14,8 +16,8 @@ if __name__ == '__main__':
     plt.plot(df['iteration'], df['main/loss'], linewidth=1, label='train')
     plt.plot(df['iteration'][df['val/loss'].notnull()], df['val/loss'][df['val/loss'].notnull()], linewidth=1, label='validation')
     plt.legend(loc='best')
+    plt.ylim(0, 0.1)
     plt.xlabel('Iteration')
     plt.ylabel('Loss')
-    dir_ = '/'.join(args.log_file.split('/')[:-1])
-    plt.savefig(os.path.join(dir_, 'loss_history.png'))
-    # plt.show()
+    save_dir = '/'.join(args.log_file.split('/')[:-1])
+    plt.savefig(os.path.join(save_dir, 'loss_history.png'))
