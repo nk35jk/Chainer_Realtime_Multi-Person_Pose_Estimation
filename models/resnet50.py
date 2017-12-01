@@ -102,20 +102,20 @@ class ResNet(chainer.Chain):
 class ResNet50(chainer.Chain):
     """resnet50 FPN"""
 
-    insize = 368
+    insize = 384
 
     def __init__(self, joints=19, limbs=38):
         super(ResNet50, self).__init__()
         with self.init_scope():
             self.res = ResNet()
-            self.newC5 = L.Convolution2D(2048, 256, 1, stride=1, pad=0)
-            self.newC4 = L.Convolution2D(1024, 256, 1, stride=1, pad=0)
-            self.newC3 = L.Convolution2D(512, 256, 1, stride=1, pad=0)
-            self.newC2 = L.Convolution2D(256, 256, 1, stride=1, pad=0)
+            self.C5lateral = L.Convolution2D(2048, 256, 1, stride=1, pad=0)
+            self.C4lateral = L.Convolution2D(1024, 256, 1, stride=1, pad=0)
+            self.C3lateral = L.Convolution2D(512, 256, 1, stride=1, pad=0)
+            self.C2lateral = L.Convolution2D(256, 256, 1, stride=1, pad=0)
 
-            self.upP5 = L.Deconvolution2D(256, 256, 4, stride=2, pad=1)
-            self.upP4 = L.Deconvolution2D(256, 256, 4, stride=2, pad=1)
-            self.upP3 = L.Deconvolution2D(256, 256, 4, stride=2, pad=1)
+            self.convP4 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
+            self.convP3 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
+            self.convP2 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
 
             self.conv1_L1 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
             self.conv2_L1 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
@@ -144,32 +144,33 @@ class ResNet50(chainer.Chain):
     def __call__(self, x):
         pafs, heatmaps = [], []
 
-        h2, h3, h4, h5 = self.res(x)
+        c2, c3, c4, c5 = self.res(x)
 
-        h5n = self.newC5(h5)
-        h4n = self.newC4(h4)
-        h3n = self.newC3(h3)
-        h2n = self.newC2(h2)
+        c5l = self.C5lateral(c5)
+        c4l = self.C4lateral(c4)
+        c3l = self.C3lateral(c3)
+        c2l = self.C2lateral(c2)
 
-        hs = [h5n]
-        h = self.upP5(h5n)
-        h = h[:, :, :-1, :-1] + h4n
-        hs.append(h)
-        h = self.upP4(h)
-        h = h + h3n
-        hs.append(h)
-        h = self.upP3(h)
-        h = h + h2n
-        hs.append(h)
+        p5 = c5l
 
-        h5_, h4_, h3_, h2_ = hs
+        h = F.resize_images(p5, (p5.shape[2]*2, p5.shape[3]*2))
+        h = h[:, :, :c4l.shape[2], :c4l.shape[3]] + c4l
+        p4 = self.convP4(h)
 
-        h1 = F.relu(self.conv1_L1(h))
+        h = F.resize_images(p4, (p4.shape[2]*2, p4.shape[3]*2))
+        h = h[:, :, :c3l.shape[2], :c3l.shape[3]] + c3l
+        p3 = self.convP3(h)
+
+        h = F.resize_images(p3, (p3.shape[2]*2, p3.shape[3]*2))
+        h = h[:, :, :c2l.shape[2], :c2l.shape[3]] + c2l
+        p2 = self.convP2(h)
+
+        h1 = F.relu(self.conv1_L1(p2))
         h1 = F.relu(self.conv2_L1(h1))
         h1 = F.relu(self.conv3_L1(h1))
         h1 = F.relu(self.conv4_L1(h1))
         pafs.append(h1)
-        h2 = F.relu(self.conv1_L2(h))
+        h2 = F.relu(self.conv1_L2(p2))
         h2 = F.relu(self.conv2_L2(h2))
         h2 = F.relu(self.conv3_L2(h2))
         h2 = F.relu(self.conv4_L2(h2))
@@ -196,6 +197,11 @@ class ResNet50(chainer.Chain):
 
 if __name__ == '__main__':
     model = ResNet50()
-    arr = np.random.rand(1, 3, 368, 368).astype('f')
+    arr = np.random.rand(1, 3, 384, 384).astype('f')
     st = time.time()
     h1s, h2s = model(arr)
+
+    import chainer.computational_graph as c
+    g = c.build_computational_graph(h1s)
+    with open('graph.dot', 'w') as o:
+        o.write(g.dump())

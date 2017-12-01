@@ -74,7 +74,7 @@ params = {
     'heatmap_peak_thresh': 0.1,
     'inner_product_thresh': 0.05,
     'length_penalty_ratio': 0.5,
-    'n_subset_limbs_thresh': 7,
+    'n_subset_limbs_thresh': 4,
     'subset_score_thresh': 0.4,
     'limbs_point': [
         [JointType.Neck, JointType.RightWaist],

@@ -22,8 +22,8 @@ class PoseDetector(object):
             # load model
             print('Loading PoseNet...')
             self.model = params['archs'][arch]()
-            if weights_file:
-                serializers.load_npz(weights_file, self.model)
+            # if weights_file:
+            #     serializers.load_npz(weights_file, self.model)
 
         self.device = device
         if self.device >= 0:
@@ -240,7 +240,7 @@ class PoseDetector(object):
             joints = []
             for joint_index in subset[:18].astype('i'):
                 if joint_index >= 0:
-                    joint = all_peaks[joint_index][1:3].astype('i').tolist()
+                    joint = all_peaks[joint_index][1:3].tolist()
                     joint.append(2)
                     joints.append(joint)
                 else:
@@ -478,7 +478,7 @@ def draw_person_pose(oriImg, person_pose):
     canvas = oriImg.copy()
 
     # limbs
-    for pose in person_pose:
+    for pose in person_pose.round().astype('i'):
         for i, (limb, color) in enumerate(zip(params['limbs_point'], limb_colors)):
             if i != 9 and i != 13:  # don't show ear-shoulder connection
                 limb_ind = np.array(limb)
@@ -487,7 +487,7 @@ def draw_person_pose(oriImg, person_pose):
                     cv2.line(canvas, tuple(joint1), tuple(joint2), color, 2)
 
     # joints
-    for pose in person_pose:
+    for pose in person_pose.round().astype('i'):
         for i, ((x, y, v), color) in enumerate(zip(pose, joint_colors)):
             if v != 0:
                 cv2.circle(canvas, (x, y), 6, color, -1)
