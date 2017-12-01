@@ -99,13 +99,13 @@ class ResNet(chainer.Chain):
         return hs
 
 
-class ResNet50(chainer.Chain):
-    """resnet50 FPN"""
+class ResNetFPN(chainer.Chain):
+    """resnet50-FPN"""
 
     insize = 384
 
     def __init__(self, joints=19, limbs=38):
-        super(ResNet50, self).__init__()
+        super(ResNetFPN, self).__init__()
         with self.init_scope():
             self.res = ResNet()
             self.C5lateral = L.Convolution2D(2048, 256, 1, stride=1, pad=0)
@@ -197,7 +197,7 @@ class ResNet50(chainer.Chain):
 
 
 if __name__ == '__main__':
-    model = ResNet50()
+    model = ResNetFPN()
     arr = np.random.rand(1, 3, 384, 384).astype('f')
     st = time.time()
     h1s, h2s = model(arr)
