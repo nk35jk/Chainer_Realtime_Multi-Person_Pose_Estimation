@@ -22,8 +22,8 @@ class PoseDetector(object):
             # load model
             print('Loading PoseNet...')
             self.model = params['archs'][arch]()
-            # if weights_file:
-            #     serializers.load_npz(weights_file, self.model)
+            if weights_file:
+                serializers.load_npz(weights_file, self.model)
 
         self.device = device
         if self.device >= 0:
