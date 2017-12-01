@@ -122,6 +122,7 @@ class NN1(chainer.Chain):
     """SqueezeNet + 6 Stages including Dilated Conv"""
 
     insize = 368
+    downscale = 8
 
     def __init__(self, joints=19, limbs=38, stage=6):
         super(NN1, self).__init__(

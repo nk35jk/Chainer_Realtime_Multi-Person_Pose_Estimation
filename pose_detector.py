@@ -31,20 +31,17 @@ class PoseDetector(object):
             self.model.to_gpu()
 
             # create gaussian filter
-            ksize = params['ksize']
-            kernel = cuda.to_gpu(self.create_gaussian_kernel(sigma=params['gaussian_sigma'], ksize=ksize))
+            kernel = cuda.to_gpu(self.create_gaussian_kernel(params['gaussian_sigma'], params['ksize']))
             self.gaussian_kernel = kernel
 
     # compute gaussian filter
     def create_gaussian_kernel(self, sigma=1, ksize=5):
-        center = int(ksize / 2)
-        kernel = np.zeros((1, 1, ksize, ksize), dtype=np.float32)
-        for y in range(ksize):
-            distance_y = abs(y-center)
-            for x in range(ksize):
-                distance_x = abs(x-center)
-                kernel[0][0][y][x] = 1/(sigma**2 * 2 * np.pi) * np.exp(-(distance_x**2 + distance_y**2)/(2 * sigma**2))
-        return kernel
+        center = int(ksize /2)
+        grid_x = np.tile(np.arange(imsize), (imsize, 1))
+        grid_y = grid_x.transpose().copy()
+        grid_d2 = (grid_x - center) ** 2 + (grid_y - center) ** 2
+        kernel = 1/(sigma**2 * 2 * np.pi) * np.exp(-0.5 * grid_d2 / sigma**2)
+        return kernel.astype('f')
 
     def compute_optimal_size(self, orig_img, img_size):
         """画像のサイズが幅と高さが8の倍数になるように調節する"""

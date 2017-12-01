@@ -365,22 +365,18 @@ class CocoDataLoader(DatasetMixin):
 
     def get_sample(self, img, annotations, ignore_mask):
         """get sample data"""
-        # params
-        crop_size = params['crop_size']
-        input_size = params['input_size']
+        insize = params['insize']
         downscale = params['downscale']
-        heatmap_sigma = params['heatmap_sigma']
-        paf_sigma = params['paf_sigma']
-        downscaled_size = int(input_size / downscale)
+        downscaled_size = int(insize / downscale)
 
         # sample
         joints, valid_joints, joint_bboxes, _ = self.parse_coco_annotation(img, annotations)
         if self.mode != 'eval':
-            img, ignore_mask, joints, valid_joints = self.augment_data(img, ignore_mask, joints, valid_joints, joint_bboxes, crop_size)
-        resized_img, resized_mask, resized_joints = self.resize_data(img, ignore_mask, joints, resize_shape=(input_size, input_size))
+            img, ignore_mask, joints, valid_joints = self.augment_data(img, ignore_mask, joints, valid_joints, joint_bboxes, params['crop_size'])
+        resized_img, resized_mask, resized_joints = self.resize_data(img, ignore_mask, joints, resize_shape=(insize, insize))
 
-        resized_heatmaps = self.compute_heatmaps(resized_img, resized_joints, valid_joints, heatmap_sigma)
-        resized_pafs = self.compute_pafs(resized_img, resized_joints, valid_joints, paf_sigma)
+        resized_heatmaps = self.compute_heatmaps(resized_img, resized_joints, valid_joints, params['heatmap_sigma'])
+        resized_pafs = self.compute_pafs(resized_img, resized_joints, valid_joints, params['paf_sigma'])
 
         downscaled_img, downscaled_mask, downscaled_joints = self.resize_data(img, ignore_mask, joints, resize_shape=(downscaled_size, downscaled_size))
 

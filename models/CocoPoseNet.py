@@ -19,6 +19,7 @@ def copy_vgg_params(model):
 
 class CocoPoseNet(chainer.Chain):
     insize = 368
+    downscale = 8
 
     def __init__(self):
         super(CocoPoseNet, self).__init__(

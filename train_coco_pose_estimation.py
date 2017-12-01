@@ -4,7 +4,6 @@ import copy
 import json
 import glob
 import random
-import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -16,7 +15,7 @@ from chainer import cuda, training, reporter, function
 from chainer.training import StandardUpdater, extensions
 from chainer import serializers, optimizers, functions as F
 
-from entity import JointType, params
+from entity import JointType, params, parse_args
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
@@ -181,36 +180,6 @@ class Evaluator(extensions.Evaluator):
             observation = dict(zip(stat_names, [0]*len(stat_names)))
         summary.add(observation)
         return summary.compute_mean()
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Train pose estimation')
-    parser.add_argument('--arch', '-a', choices=params['archs'].keys(), default='posenet',
-                        help='Model architecture')
-    parser.add_argument('--batchsize', '-B', type=int, default=10,
-                        help='Learning minibatch size')
-    parser.add_argument('--valbatchsize', '-b', type=int, default=10,
-                        help='Validation minibatch size')
-    parser.add_argument('--val_samples', type=int, default=100,
-                        help='Number of validation samples')
-    parser.add_argument('--eval_samples', type=int, default=40,
-                        help='Number of validation samples')
-    parser.add_argument('--iteration', '-i', type=int, default=50000,
-                        help='Number of iterations to train')
-    parser.add_argument('--gpu', '-g', type=int, default=-1,
-                        help='GPU ID (negative value indicates CPU')
-    parser.add_argument('--initmodel',
-                        help='Initialize the model from given file')
-    parser.add_argument('--loaderjob', '-j', type=int,
-                        help='Number of parallel data loading processes')
-    parser.add_argument('--resume', '-r', default='',
-                        help='Initialize the trainer from given file')
-    parser.add_argument('--out', '-o', default='result/test',
-                        help='Output directory')
-    parser.add_argument('--test', action='store_true')
-    parser.set_defaults(test=False)
-    args = parser.parse_args()
-    return args
 
 
 if __name__ == '__main__':

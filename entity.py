@@ -1,3 +1,4 @@
+import argparse
 from enum import IntEnum
 
 from models.CocoPoseNet import CocoPoseNet
@@ -60,8 +61,6 @@ params = {
     'heatmap_sigma': 15,
     'crop_iob_thresh': 0.4,
     'crop_size': 480,
-    'input_size': 368,
-    'downscale': 4,
 
     'inference_img_size': 368,
     #'inference_scales': [0.5, 1.0, 1.5],
@@ -144,3 +143,35 @@ params = {
         [[0, 17], [17, 18], [18, 19], [19, 20]],
     ],
 }
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train pose estimation')
+    parser.add_argument('--arch', '-a', choices=params['archs'].keys(), default='posenet',
+                        help='Model architecture')
+    parser.add_argument('--batchsize', '-B', type=int, default=10,
+                        help='Learning minibatch size')
+    parser.add_argument('--valbatchsize', '-b', type=int, default=10,
+                        help='Validation minibatch size')
+    parser.add_argument('--val_samples', type=int, default=100,
+                        help='Number of validation samples')
+    parser.add_argument('--eval_samples', type=int, default=40,
+                        help='Number of validation samples')
+    parser.add_argument('--iteration', '-i', type=int, default=30000,
+                        help='Number of iterations to train')
+    parser.add_argument('--gpu', '-g', type=int, default=-1,
+                        help='GPU ID (negative value indicates CPU')
+    parser.add_argument('--initmodel',
+                        help='Initialize the model from given file')
+    parser.add_argument('--loaderjob', '-j', type=int,
+                        help='Number of parallel data loading processes')
+    parser.add_argument('--resume', '-r', default='',
+                        help='Initialize the trainer from given file')
+    parser.add_argument('--out', '-o', default='result/test',
+                        help='Output directory')
+    parser.add_argument('--test', action='store_true')
+    parser.set_defaults(test=False)
+    args = parser.parse_args()
+    params['insize'] = params['archs'][args.arch].insize
+    params['downscale'] = params['archs'][args.arch].downscale
+    return args

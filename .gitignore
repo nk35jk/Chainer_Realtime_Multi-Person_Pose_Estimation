@@ -9,3 +9,4 @@ result.png
 *.caffemodel
 *.chainermodel
 *.npz
+*.pdf

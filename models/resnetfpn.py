@@ -103,6 +103,7 @@ class ResNetFPN(chainer.Chain):
     """resnet50-FPN"""
 
     insize = 384
+    downscale = 4
 
     def __init__(self, joints=19, limbs=38):
         super(ResNetFPN, self).__init__()
