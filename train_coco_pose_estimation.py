@@ -22,7 +22,7 @@ from pose_detector import PoseDetector, draw_person_pose
 
 from models import CocoPoseNet
 from models import nn1
-from models import resnet50
+from models import resnetfpn
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t, ignore_mask):
@@ -54,10 +54,10 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t, ignore_mask):
 def preprocess(imgs):
     xp = cuda.get_array_module(imgs)
     x_data = imgs.astype('f')
-    if args.arch == 'posenet':
+    if args.arch in ['posenet']:
         x_data /= 255
         x_data -= 0.5
-    elif args.arch == 'nn1':
+    elif args.arch in ['nn1', 'resnetfpn']:
         x_data -= xp.array([104, 117, 123])
     x_data = x_data.transpose(0, 3, 1, 2)
     return x_data
@@ -222,7 +222,7 @@ if __name__ == '__main__':
         CocoPoseNet.copy_vgg_params(model)
     elif args.arch == 'nn1':
         nn1.copy_squeezenet_params(model.squeeze)
-    elif args.arch == 'resnet50':
+    elif args.arch == 'resnetfpn':
         chainer.serializers.load_npz('models/resnet50.npz', model.res)
 
     if args.initmodel:

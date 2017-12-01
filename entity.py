@@ -2,7 +2,7 @@ from enum import IntEnum
 
 from models.CocoPoseNet import CocoPoseNet
 from models.nn1 import NN1
-from models.resnet50 import ResNet50
+from models.resnetfpn import ResNetFPN
 
 from models.FaceNet import FaceNet
 from models.HandNet import HandNet
@@ -54,7 +54,7 @@ params = {
         'facenet': FaceNet,
         'handnet': HandNet,
         'nn1': NN1,
-        'resnet50': ResNet50,
+        'resnetfpn': ResNetFPN,
     },
     'paf_sigma': 11,
     'heatmap_sigma': 15,
