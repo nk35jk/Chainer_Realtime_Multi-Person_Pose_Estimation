@@ -176,7 +176,7 @@ class ResNet50(chainer.Chain):
         h2 = F.relu(self.conv4_L2(h2))
         heatmaps.append(h2)
 
-        h = F.concat((h1, h2, h), axis=1) # channel concat
+        h = F.concat((h1, h2, p2), axis=1) # channel concat
         h1 = F.relu(self.Mconv1_stage2_L1(h)) # branch1
         h1 = F.relu(self.Mconv2_stage2_L1(h1))
         h1 = F.relu(self.Mconv3_stage2_L1(h1))
@@ -184,6 +184,7 @@ class ResNet50(chainer.Chain):
         h1 = F.relu(self.Mconv5_stage2_L1(h1))
         h1 = F.relu(self.Mconv6_stage2_L1(h1))
         h1 = self.Mconv7_stage2_L1(h1)
+        pafs.append(h1)
         h2 = F.relu(self.Mconv1_stage2_L2(h)) # branch2
         h2 = F.relu(self.Mconv2_stage2_L2(h2))
         h2 = F.relu(self.Mconv3_stage2_L2(h2))
@@ -191,9 +192,9 @@ class ResNet50(chainer.Chain):
         h2 = F.relu(self.Mconv5_stage2_L2(h2))
         h2 = F.relu(self.Mconv6_stage2_L2(h2))
         h2 = self.Mconv7_stage2_L2(h2)
-        pafs.append(h1)
         heatmaps.append(h2)
         return pafs, heatmaps
+
 
 if __name__ == '__main__':
     model = ResNet50()
