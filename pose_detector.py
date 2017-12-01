@@ -408,8 +408,17 @@ class PoseDetector(object):
         # pad
         padded_img = np.zeros((box_h, box_w, img_ch), dtype=np.uint8)
         padded_img[bias_y:bias_y+crop_h, bias_x:bias_x+crop_w] = cropped_img
-
         return padded_img
+
+    def preprocess(self, img):
+        x_data = img.astype('f')
+        if args.arch in ['posenet']:
+            x_data /= 255
+            x_data -= 0.5
+        elif args.arch in ['nn1', 'resnetfpn']:
+            x_data -= np.array([104, 117, 123])
+        x_data = x_data.transpose(2, 0, 1)[None]
+        return x_data
 
     def __call__(self, orig_img, fast_mode=False):
         st = time.time()
@@ -428,7 +437,7 @@ class PoseDetector(object):
             resized_input_img_w, resized_input_img_h = self.compute_optimal_size(orig_img, img_size)
 
             resized_image = cv2.resize(orig_img, (resized_input_img_w, resized_input_img_h))
-            x_data = np.array(resized_image[np.newaxis], dtype=np.float32).transpose(0, 3, 1, 2) / 256 - 0.5
+            x_data = self.preprocess(resized_image)
 
             if self.device >= 0:
                 x_data = cuda.to_gpu(x_data)
