@@ -11,8 +11,6 @@ from chainer import cuda, serializers, functions as F
 from entity import params, JointType
 from models.CocoPoseNet import CocoPoseNet
 
-chainer.using_config('enable_backprop', False)
-
 
 class PoseDetector(object):
     def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False):
@@ -575,6 +573,9 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--precise', action='store_true', help='visualize results')
     args = parser.parse_args()
+
+    chainer.config.enable_backprop = False
+    chainer.config.train = False
 
     # load model
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)

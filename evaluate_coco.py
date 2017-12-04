@@ -13,6 +13,11 @@ from entity import JointType, params
 from pose_detector import PoseDetector
 from pose_detector import draw_person_pose
 
+import chainer
+
+chainer.config.enable_backprop = False
+chainer.config.train = False
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='COCO evaluation')
@@ -31,8 +36,8 @@ if __name__ == '__main__':
 
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)
 
-    # cv2.namedWindow('results', cv2.WINDOW_NORMAL)
-
+    cv2.namedWindow('results', cv2.WINDOW_NORMAL)
+    
     res = []
     imgIds = []
     # for i in range(len(eval_loader)):
@@ -77,25 +82,4 @@ if __name__ == '__main__':
             cv2.waitKey(1)
 
         # # GT (test)
-        # for ann in annotations:
-        #     if ann['num_keypoints'] > 0:
-        #         res_dict = {}
-        #         res_dict['category_id'] = 1
-        #         res_dict['image_id'] = img_id
-        #         res_dict['score'] = 0
-        #
-        #         k = np.array(ann['keypoints']).reshape(-1, 3)
-        #         k[:, 0] += 1
-        #         k[:, 1] += 1
-        #         res_dict['keypoints'] = k.ravel()
-        #
-        #         # res_dict['keypoints'] = ann['keypoints']
-        #         res.append(res_dict)
-
-
-    cocoDt = coco_val.loadRes(res)
-    cocoEval = COCOeval(coco_val, cocoDt, 'keypoints')
-    cocoEval.params.imgIds = imgIds
-    cocoEval.evaluate()
-    cocoEval.accumulate()
-    cocoEval.summarize()
+        # for ann in annotati
