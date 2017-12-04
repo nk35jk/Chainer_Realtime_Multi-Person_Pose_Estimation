@@ -1,5 +1,6 @@
 import os
 import cv2
+import time
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,12 +20,18 @@ if __name__ == '__main__':
     parser.add_argument('weights', help='weights file path')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--vis', action='store_true', help='visualize results')
+    parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
     args = parser.parse_args()
+    params['inference_img_size'] = params['archs'][args.arch].insize
+    params['insize'] = params['archs'][args.arch].insize
+    params['downscale'] = params['archs'][args.arch].downscale
 
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
     eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=None)
 
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)
+
+    # cv2.namedWindow('results', cv2.WINDOW_NORMAL)
 
     res = []
     imgIds = []
@@ -38,7 +45,9 @@ if __name__ == '__main__':
             continue
         imgIds.append(img_id)
 
+        st = time.time()
         person_pose_array = pose_detector(img)
+        print('inference: {:.2f}s'.format(time.time() - st))
 
         for person_pose in person_pose_array:
             res_dict = {}
@@ -57,9 +66,12 @@ if __name__ == '__main__':
         if args.vis:
             img = draw_person_pose(img, person_pose_array)
 
-            # for ann in annotations:
-            #     for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):
-            #         cv2.circle(img, tuple(joint.tolist()), 3, (0, 0, 255), -1)
+            for ann in annotations:
+                for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):
+                    cv2.circle(img, tuple(joint.tolist()), 3, (0, 0, 255), -1)
+
+            # gt_poses = np.array([np.array(ann['keypoints']).reshape(-1, 3) for ann in annotations])
+            # img = draw_person_pose(img, gt_poses)
 
             cv2.imshow('results', img)
             cv2.waitKey(1)
@@ -72,13 +84,14 @@ if __name__ == '__main__':
         #         res_dict['image_id'] = img_id
         #         res_dict['score'] = 0
         #
-        #         k = np.array(ann['keypoints']).reshape(17, 3)
+        #         k = np.array(ann['keypoints']).reshape(-1, 3)
         #         k[:, 0] += 1
         #         k[:, 1] += 1
         #         res_dict['keypoints'] = k.ravel()
         #
         #         # res_dict['keypoints'] = ann['keypoints']
         #         res.append(res_dict)
+
 
     cocoDt = coco_val.loadRes(res)
     cocoEval = COCOeval(coco_val, cocoDt, 'keypoints')

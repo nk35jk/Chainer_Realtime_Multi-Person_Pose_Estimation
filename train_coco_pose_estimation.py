@@ -33,12 +33,19 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t, ignore_mask):
     heatmap_masks = ignore_mask[:, None].repeat(heatmaps_t.shape[1], axis=1)
 
     for pafs_y, heatmaps_y in zip(pafs_ys, heatmaps_ys): # compute loss on each stage
-        # consider mask on each stage
         stage_pafs_t = pafs_t.copy()
         stage_heatmaps_t = heatmaps_t.copy()
+        stage_paf_masks = paf_masks.copy()
+        stage_heatmap_masks = heatmap_masks.copy()
 
-        stage_pafs_t[paf_masks == True] = pafs_y.data[paf_masks == True]
-        stage_heatmaps_t[heatmap_masks == True] = heatmaps_y.data[heatmap_masks == True]
+        if pafs_y.shape != stage_pafs_t.shape:
+            stage_pafs_t = F.resize_images(stage_pafs_t, pafs_y.shape[2:]).data
+            stage_heatmaps_t = F.resize_images(stage_heatmaps_t, pafs_y.shape[2:]).data
+            stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
+            stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
+
+        stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
+        stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
 
         pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
         heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)

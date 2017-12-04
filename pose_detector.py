@@ -15,7 +15,9 @@ chainer.using_config('enable_backprop', False)
 
 
 class PoseDetector(object):
-    def __init__(self, arch=None, weights_file=None, model=None, device=-1):
+    def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False):
+        self.arch = arch
+        self.precise = precise
         if model is not None:
             self.model = model
         else:
@@ -31,34 +33,45 @@ class PoseDetector(object):
             self.model.to_gpu()
 
             # create gaussian filter
-            kernel = cuda.to_gpu(self.create_gaussian_kernel(params['gaussian_sigma'], params['ksize']))
-            self.gaussian_kernel = kernel
+            self.gaussian_kernel = self.create_gaussian_kernel(params['gaussian_sigma'], params['ksize'])[None, None]
+            self.gaussian_kernel = cuda.to_gpu(self.gaussian_kernel)
 
     # compute gaussian filter
     def create_gaussian_kernel(self, sigma=1, ksize=5):
-        center = int(ksize /2)
-        grid_x = np.tile(np.arange(imsize), (imsize, 1))
+        center = int(ksize / 2)
+        grid_x = np.tile(np.arange(ksize), (ksize, 1))
         grid_y = grid_x.transpose().copy()
         grid_d2 = (grid_x - center) ** 2 + (grid_y - center) ** 2
         kernel = 1/(sigma**2 * 2 * np.pi) * np.exp(-0.5 * grid_d2 / sigma**2)
         return kernel.astype('f')
 
-    def compute_optimal_size(self, orig_img, img_size):
-        """画像のサイズが幅と高さが8の倍数になるように調節する"""
+    def pad_image(self, img, stride, pad_value):
+        h, w, _ = img.shape
+
+        pad = [0] * 2
+        pad[0] = (stride - (h % stride)) % stride # down
+        pad[1] = (stride - (w % stride)) % stride # right
+
+        img_padded = np.zeros((h+pad[0], w+pad[1], 3), 'uint8') + pad_value
+        img_padded[:h, :w, :] = img.copy()
+        return img_padded, pad
+
+    def compute_optimal_size(self, orig_img, img_size, stride=8):
+        """画像のサイズが幅と高さがstrideの倍数になるように調節する"""
         orig_img_h, orig_img_w, _ = orig_img.shape
         aspect = orig_img_h / orig_img_w
         if orig_img_h < orig_img_w:
             img_h = img_size
             img_w = np.round(img_size / aspect).astype(int)
-            surplus = img_w % 8
+            surplus = img_w % stride
             if surplus != 0:
-                img_w += 8 - surplus
+                img_w += stride - surplus
         else:
             img_w = img_size
             img_h = np.round(img_size * aspect).astype(int)
-            surplus = img_h % 8
+            surplus = img_h % stride
             if surplus != 0:
-                img_h += 8 - surplus
+                img_h += stride - surplus
         return (img_w, img_h)
 
     def compute_peaks_from_heatmaps(self, heatmaps):
@@ -231,7 +244,7 @@ class PoseDetector(object):
         subsets = subsets[keep]
         return subsets
 
-    def subsets_to_person_pose_array(self, subsets, all_peaks):
+    def subsets_to_pose_array(self, subsets, all_peaks):
         person_pose_array = []
         for subset in subsets:
             joints = []
@@ -333,7 +346,6 @@ class PoseDetector(object):
         cropped_img = self.crop_image(img, bbox)
         return cropped_img, bbox
 
-
     def crop_face(self, img, person_pose, unit_length):
         face_size = unit_length
         face_img = None
@@ -350,7 +362,6 @@ class PoseDetector(object):
             face_img = self.crop_image(img, bbox)
 
         return face_img, bbox
-
 
     def crop_hands(self, img, person_pose, unit_length):
         hands = {
@@ -409,15 +420,72 @@ class PoseDetector(object):
 
     def preprocess(self, img):
         x_data = img.astype('f')
-        if args.arch in ['posenet']:
+        if self.arch in ['posenet']:
             x_data /= 255
             x_data -= 0.5
-        elif args.arch in ['nn1', 'resnetfpn']:
+        elif self.arch in ['nn1', 'resnetfpn']:
             x_data -= np.array([104, 117, 123])
         x_data = x_data.transpose(2, 0, 1)[None]
         return x_data
 
+    def detect_precise(self, orig_img):
+        st = time.time()
+        orig_img_h, orig_img_w, _ = orig_img.shape
+
+        pafs_sum = 0
+        heatmaps_sum = 0
+        # use only the first scale on fast mode
+
+        interpolation = cv2.INTER_CUBIC
+
+        for scale in params['inference_scales']:
+            print("Inference scale: %.1f..." % (scale))
+
+            multiplier = scale * params['inference_img_size'] / min(orig_img.shape[:2])
+            print(multiplier)
+            img = cv2.resize(orig_img, (0, 0), fx=multiplier, fy=multiplier, interpolation=interpolation)
+            padded_img, pad = self.pad_image(img, params['downscale'], 128)
+
+            x_data = self.preprocess(padded_img)
+            if self.device >= 0:
+                x_data = cuda.to_gpu(x_data)
+
+            h1s, h2s = self.model(x_data)
+
+            tmp_paf = h1s[-1][0].data.transpose(1, 2, 0)
+            tmp_heatmap = h2s[-1][0].data.transpose(1, 2, 0)
+
+            if self.device >= 0:
+                tmp_paf = cuda.to_cpu(tmp_paf)
+                tmp_heatmap = cuda.to_cpu(tmp_heatmap)
+
+            tmp_paf = cv2.resize(tmp_paf, (0, 0), fx=params['downscale'], fy=params['downscale'], interpolation=interpolation)
+            tmp_paf = tmp_paf[:padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1], :]
+            pafs_sum += cv2.resize(tmp_paf, (orig_img_w, orig_img_h), interpolation=interpolation)
+
+            tmp_heatmap = cv2.resize(tmp_heatmap, (0, 0), fx=params['downscale'], fy=params['downscale'], interpolation=interpolation)
+            tmp_heatmap = tmp_heatmap[:padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1], :]
+            heatmaps_sum += cv2.resize(tmp_heatmap, (orig_img_w, orig_img_h), interpolation=interpolation)
+
+        pafs = (pafs_sum / len(params['inference_scales'])).transpose(2, 0, 1)
+        heatmaps = (heatmaps_sum / len(params['inference_scales'])).transpose(2, 0, 1)
+
+        if self.device >= 0:
+            cuda.get_device_from_id(self.device).synchronize()
+
+        print('forward: {:.2f}'.format(time.time() - st))
+
+        all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
+        if len(all_peaks) == 0:
+            return np.empty((0, len(JointType), 3))
+        all_connections = self.compute_connections(pafs, all_peaks, orig_img_w, params)
+        subsets = self.grouping_key_points(all_connections, all_peaks, params)
+        poses = self.subsets_to_pose_array(subsets, all_peaks)
+        return poses
+
     def __call__(self, orig_img, fast_mode=False):
+        if self.precise:
+            return self.detect_precise(orig_img)
         st = time.time()
         orig_img_h, orig_img_w, _ = orig_img.shape
 
@@ -460,13 +528,13 @@ class PoseDetector(object):
         subsets = self.grouping_key_points(all_connections, all_peaks, params)
         all_peaks[:, 1] *= orig_img_w / resized_output_img_w
         all_peaks[:, 2] *= orig_img_h / resized_output_img_h
-        person_pose_array = self.subsets_to_person_pose_array(subsets, all_peaks)
-        return person_pose_array
+        poses = self.subsets_to_pose_array(subsets, all_peaks)
+        return poses
 
 
-def draw_person_pose(oriImg, person_pose):
-    if len(person_pose) == 0:
-        return oriImg
+def draw_person_pose(orig_img, poses):
+    if len(poses) == 0:
+        return orig_img
 
     limb_colors = [
         [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255], [0, 170, 255],
@@ -481,10 +549,10 @@ def draw_person_pose(oriImg, person_pose):
         [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], [170, 0, 255],
         [255, 0, 255], [255, 0, 170], [255, 0, 85]]
 
-    canvas = oriImg.copy()
+    canvas = orig_img.copy()
 
     # limbs
-    for pose in person_pose.round().astype('i'):
+    for pose in poses.round().astype('i'):
         for i, (limb, color) in enumerate(zip(params['limbs_point'], limb_colors)):
             if i != 9 and i != 13:  # don't show ear-shoulder connection
                 limb_ind = np.array(limb)
@@ -493,7 +561,7 @@ def draw_person_pose(oriImg, person_pose):
                     cv2.line(canvas, tuple(joint1), tuple(joint2), color, 2)
 
     # joints
-    for pose in person_pose.round().astype('i'):
+    for pose in poses.round().astype('i'):
         for i, ((x, y, v), color) in enumerate(zip(pose, joint_colors)):
             if v != 0:
                 cv2.circle(canvas, (x, y), 6, color, -1)
@@ -505,10 +573,11 @@ if __name__ == '__main__':
     parser.add_argument('weights', help='weights file path')
     parser.add_argument('--img', '-i', default=None, help='image file path')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--precise', action='store_true', help='visualize results')
     args = parser.parse_args()
 
     # load model
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)
 
     while True:
         # read image
@@ -516,10 +585,10 @@ if __name__ == '__main__':
 
         # inference
         st = time.time()
-        person_pose_array = pose_detector(img)
+        poses = pose_detector(img)
         print('inference: {:.2f}'.format(time.time() - st))
 
         # draw and save image
-        img = draw_person_pose(img, person_pose_array)
+        img = draw_person_pose(img, poses)
         print('Saving result into result.png...')
         cv2.imwrite('result.png', img)
