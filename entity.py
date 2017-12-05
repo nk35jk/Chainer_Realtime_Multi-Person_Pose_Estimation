@@ -50,6 +50,7 @@ class JointType(IntEnum):
 
 params = {
     'coco_dir': 'coco',
+    'coco_stuff_dir': 'cocostuff-10k-v1',
     'archs': {
         'posenet': CocoPoseNet,
         'facenet': FaceNet,
@@ -65,8 +66,8 @@ params = {
     'downscale': 8,
 
     'inference_img_size': 368,
-    'inference_scales': [0.5, 1, 1.5, 2],
-    # 'inference_scales': [1.0],
+    # 'inference_scales': [0.5, 1, 1.5, 2],
+    'inference_scales': [1.0],
     'heatmap_size': 320,
     'gaussian_sigma': 2.5,
     'ksize': 17,
@@ -172,7 +173,9 @@ def parse_args():
     parser.add_argument('--out', '-o', default='result/test',
                         help='Output directory')
     parser.add_argument('--test', action='store_true')
+    parser.add_argument('--mask', action='store_true')
     parser.set_defaults(test=False)
+    parser.set_defaults(mask=False)
     args = parser.parse_args()
     params['insize'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale

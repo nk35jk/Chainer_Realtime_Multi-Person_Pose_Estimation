@@ -3,6 +3,7 @@ __pycache__/
 cocoapi/
 coco/
 /coco
+/cocostuff-10k-v1
 result/
 result.png
 .ipynb_checkpoints

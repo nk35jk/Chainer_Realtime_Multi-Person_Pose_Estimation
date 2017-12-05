@@ -73,7 +73,7 @@ class SqueezeNet(chainer.Chain):
 
 
 class StageN(chainer.Chain):
-    def __init__(self, joints, limbs):
+    def __init__(self, joints, limbs, stuffs):
         super(StageN, self).__init__(
             conv1_1=L.Convolution2D(128+joints+limbs, 128, 3, stride=1, pad=1),
             conv1_2=L.DilatedConvolution2D(128, 128, 3, stride=1, pad=2, dilate=2),
@@ -93,9 +93,16 @@ class StageN(chainer.Chain):
             conv4_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
             conv5_L2=L.Convolution2D(128, 128, 1, stride=1, pad=0),
             conv6_L2=L.Convolution2D(128, joints, 1, stride=1, pad=0),
+
+            conv1_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+            conv2_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+            conv3_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+            conv4_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+            conv5_L3=L.Convolution2D(128, 128, 1, stride=1, pad=0),
+            conv6_L3=L.Convolution2D(128, stuffs, 1, stride=1, pad=0),
         )
 
-    def __call__(self, h1, h2, feature_map):
+    def __call__(self, h1, h2, h3, feature_map):
         h = F.concat((h1, h2, feature_map), axis=1)
         h = F.relu(self.conv1_1(h))
         h = F.relu(self.conv1_2(h))
@@ -115,7 +122,14 @@ class StageN(chainer.Chain):
         h2 = F.relu(self.conv4_L2(h2))
         h2 = F.relu(self.conv5_L2(h2))
         h2 = self.conv6_L2(h2)
-        return h1, h2
+
+        h3 = F.relu(self.conv1_L3(h))
+        h3 = F.relu(self.conv2_L3(h3))
+        h3 = F.relu(self.conv3_L3(h3))
+        h3 = F.relu(self.conv4_L3(h3))
+        h3 = F.relu(self.conv5_L3(h3))
+        h3 = self.conv6_L3(h3)
+        return h1, h2, h3
 
 
 class NN1(chainer.Chain):
@@ -124,7 +138,7 @@ class NN1(chainer.Chain):
     insize = 368
     downscale = 8
 
-    def __init__(self, joints=19, limbs=38, stage=6):
+    def __init__(self, joints=19, limbs=38, stuffs=182, stage=6, compute_mask=False):
         super(NN1, self).__init__(
             squeeze=SqueezeNet(res=True),
             conv1_1=L.Convolution2D(512, 256, 3, stride=1, pad=1),
@@ -143,15 +157,19 @@ class NN1(chainer.Chain):
             conv3_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
             conv4_L2=L.Convolution2D(128, 512, 1, stride=1, pad=0),
             conv5_L2=L.Convolution2D(512, joints, 1, stride=1, pad=0),
+
+            conv1_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+            conv2_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+            conv3_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
+            conv4_L3=L.Convolution2D(128, 512, 1, stride=1, pad=0),
+            conv5_L3=L.Convolution2D(512, stuffs, 1, stride=1, pad=0),
         )
-        links = [('stage{}'.format(i), StageN(joints, limbs)) for i in range(2, stage+1)]
+        links = [('stage{}'.format(i), StageN(joints, limbs, stuffs)) for i in range(2, stage+1)]
         [self.add_link(*l) for l in links]
         self.stagen = links
-        self.joints = joints
-        self.limbs = limbs
 
     def __call__(self, x):
-        y1s, y2s = [], []
+        y1s, y2s, y3s = [], [], []
 
         st1 = time.time()
         h = self.squeeze(x)
@@ -175,17 +193,26 @@ class NN1(chainer.Chain):
         h2 = F.relu(self.conv4_L2(h2))
         h2 = self.conv5_L2(h2)
         y2s.append(h2)
+        if self.compute_mask:
+            h3 = F.relu(self.conv1_L3(feature_map))
+            h3 = F.relu(self.conv2_L3(h3))
+            h3 = F.relu(self.conv3_L3(h3))
+            h3 = F.relu(self.conv4_L3(h3))
+            h3 = self.conv5_L3(h3)
+            y3s.append(h3)
         # print('stage1: {:.4f}s'.format(time.time() - st))
 
         # stage2~
         for name, stage in self.stagen:
             st = time.time()
-            h1, h2 = stage(h1, h2, feature_map)
+            h1, h2, h3 = stage(h1, h2, h3, feature_map)
             y1s.append(h1)
             y2s.append(h2)
+            if self.compute_mask:
+                y3s.append(h3)
             # print('{}: {:.4f}s'.format(name, time.time() - st))
         # print('forward: {:.4f}s'.format(time.time() - st1))
-        return y1s, y2s
+        return y1s, y2s, y3s
 
 if __name__ == '__main__':
     model = NN1()
