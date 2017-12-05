@@ -37,7 +37,7 @@ if __name__ == '__main__':
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)
 
     cv2.namedWindow('results', cv2.WINDOW_NORMAL)
-    
+
     res = []
     imgIds = []
     # for i in range(len(eval_loader)):
@@ -82,4 +82,24 @@ if __name__ == '__main__':
             cv2.waitKey(1)
 
         # # GT (test)
-        # for ann in annotati
+        # for ann in annotations:
+        #     if ann['num_keypoints'] > 0:
+        #         res_dict = {}
+        #         res_dict['category_id'] = 1
+        #         res_dict['image_id'] = img_id
+        #         res_dict['score'] = 0
+        #
+        #         k = np.array(ann['keypoints']).reshape(17, 3)
+        #         k[:, 0] += 1
+        #         k[:, 1] += 1
+        #         res_dict['keypoints'] = k.ravel()
+        #
+        #         # res_dict['keypoints'] = ann['keypoints']
+        #         res.append(res_dict)
+
+    cocoDt = coco_val.loadRes(res)
+    cocoEval = COCOeval(coco_val, cocoDt, 'keypoints')
+    cocoEval.params.imgIds = imgIds
+    cocoEval.evaluate()
+    cocoEval.accumulate()
+    cocoEval.summarize()
