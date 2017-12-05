@@ -45,9 +45,9 @@ if __name__ == '__main__':
     # for i in [9]:
         print(i)
         img, annotations, img_id = eval_loader.get_example(i)
-        if annotations is None:
-            print('None')
-            continue
+        # if annotations is None:
+        #     print('None')
+        #     continue
         imgIds.append(img_id)
 
         st = time.time()
