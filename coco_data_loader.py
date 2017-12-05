@@ -340,7 +340,7 @@ class CocoDataLoader(DatasetMixin):
             ignore_mask = np.zeros(img.shape[:2], 'bool')
         else:
             ignore_mask = ignore_mask == 255
-        params['coco_stuff_dir'] = '/Users/naoki.kato/data/cocostuff-10k-v1/'
+            
         stuff_path = os.path.join(params['coco_stuff_dir'], 'annotations/COCO_train2014_{:012d}.mat'.format(img_id))
         if os.path.exists(stuff_path):
             stuff_mask = loadmat(stuff_path)['S']
