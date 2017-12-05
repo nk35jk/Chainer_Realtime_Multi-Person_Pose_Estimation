@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)
 
-    cv2.namedWindow('results', cv2.WINDOW_NORMAL)
+    # cv2.namedWindow('results', cv2.WINDOW_NORMAL)
 
     res = []
     imgIds = []
@@ -78,8 +78,8 @@ if __name__ == '__main__':
             # gt_poses = np.array([np.array(ann['keypoints']).reshape(-1, 3) for ann in annotations])
             # img = draw_person_pose(img, gt_poses)
 
-            cv2.imshow('results', img)
-            cv2.waitKey(1)
+            # cv2.imshow('results', img)
+            # cv2.waitKey(1)
 
         # # GT (test)
         # for ann in annotations:
