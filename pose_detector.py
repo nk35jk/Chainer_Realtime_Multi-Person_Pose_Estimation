@@ -527,7 +527,6 @@ class PoseDetector(object):
         all_peaks[:, 1] *= orig_img_w / resized_output_img_w
         all_peaks[:, 2] *= orig_img_h / resized_output_img_h
         poses = self.subsets_to_pose_array(subsets, all_peaks)
-        import ipdb; ipdb.set_trace()
         return poses
 
 

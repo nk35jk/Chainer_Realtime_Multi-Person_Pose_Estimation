@@ -340,7 +340,7 @@ class CocoDataLoader(DatasetMixin):
             ignore_mask = np.zeros(img.shape[:2], 'bool')
         else:
             ignore_mask = ignore_mask == 255
-            
+
         stuff_path = os.path.join(params['coco_stuff_dir'], 'annotations/COCO_train2014_{:012d}.mat'.format(img_id))
         if os.path.exists(stuff_path):
             stuff_mask = loadmat(stuff_path)['S']
@@ -366,8 +366,9 @@ class CocoDataLoader(DatasetMixin):
         return resized_img, pafs, heatmaps, ignore_mask, stuff_mask
 
 if __name__ == '__main__':
-    coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
-    data_loader = CocoDataLoader(coco)
+    mode = 'val'
+    coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
+    data_loader = CocoDataLoader(coco, mode=mode)
 
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
     count = 0

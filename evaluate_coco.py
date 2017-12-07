@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('weights', help='weights file path')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--vis', action='store_true', help='visualize results')
+    parser.add_argument('--mask', action='store_true')
     parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
@@ -41,8 +42,8 @@ if __name__ == '__main__':
     res = []
     imgIds = []
     # for i in range(len(eval_loader)):
-    # for i in range(10):
-    for i in [1]:
+    for i in range(10):
+    # for i in [1]:
         print(i)
         img, annotations, img_id = eval_loader.get_example(i)
 
@@ -78,8 +79,6 @@ if __name__ == '__main__':
 
             cv2.imshow('results', img)
             cv2.waitKey(1)
-
-        import ipdb; ipdb.set_trace()
 
         # # GT (test)
         # for ann in annotations:
