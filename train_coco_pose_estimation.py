@@ -104,7 +104,7 @@ class Updater(StandardUpdater):
             pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
         else:
             pafs_ys, heatmaps_ys = optimizer.target(x_data)
-            mask_ys = [None] * len(pafs_ys)
+            masks_ys = [None] * len(pafs_ys)
 
         loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
             imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
@@ -147,7 +147,7 @@ class Validator(extensions.Evaluator):
                         pafs_ys, heatmaps_ys, masks_ys = model(x_data)
                     else:
                         pafs_ys, heatmaps_ys = model(x_data)
-                        mask_ys = [None] * len(pafs_ys)
+                        masks_ys = [None] * len(pafs_ys)
 
                     loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
                         imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
