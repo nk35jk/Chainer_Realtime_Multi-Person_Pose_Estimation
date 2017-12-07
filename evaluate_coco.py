@@ -29,7 +29,6 @@ if __name__ == '__main__':
     parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
-    params['insize'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
 
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))

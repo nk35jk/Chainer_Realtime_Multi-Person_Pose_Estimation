@@ -181,8 +181,7 @@ class CocoDataLoader(DatasetMixin):
         flipped_img = cv2.flip(img, 1)
         flipped_mask = cv2.flip(mask.astype(np.uint8), 1).astype('bool')
         stuff_mask = cv2.flip(stuff_mask, 1)
-        center_pos = (np.array(img.shape[:-1]) / 2).astype(np.int64)
-        joints[:, :, 0] = center_pos[0] + center_pos[0] - joints[:, :, 0]
+        joints[:, :, 0] = img.shape[1] - 1 - joints[:, :, 0]
 
         def swap_joints(joints, valid_joints, joint_type_1, joint_type_2):
             tmp = joints[:, joint_type_1, :].copy()
@@ -383,9 +382,9 @@ if __name__ == '__main__':
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
     count = 0
     for i in range(len(data_loader)):
-        img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=i)
+        orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=i)
         if annotations is not None:
-            resized_img, pafs, heatmaps, ignore_mask, stuff_mask = data_loader.generate_labels(img, annotations, ignore_mask, stuff_mask)
+            resized_img, pafs, heatmaps, ignore_mask, stuff_mask = data_loader.generate_labels(orig_img, annotations, ignore_mask, stuff_mask)
 
             # resize to view
             shape = (params['insize'],) * 2
@@ -399,8 +398,7 @@ if __name__ == '__main__':
             img = data_loader.overlay_pafs(img, pafs)
             img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
             img = data_loader.overlay_ignore_mask(img, ignore_mask)
-            if np.any(stuff_mask != -1):
-                img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
+            # img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
 
             cv2.imshow('w', np.hstack((resized_img, img)))
             k = cv2.waitKey(0)
