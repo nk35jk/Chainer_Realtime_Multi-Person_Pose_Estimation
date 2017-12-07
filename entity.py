@@ -2,6 +2,7 @@ import argparse
 from enum import IntEnum
 
 from models.CocoPoseNet import CocoPoseNet
+from models.posenet import PoseNet
 from models.nn1 import NN1
 from models.resnetfpn import ResNetFPN
 
@@ -52,7 +53,8 @@ params = {
     'coco_dir': 'coco',
     'coco_stuff_dir': 'cocostuff-10k-v1',
     'archs': {
-        'posenet': CocoPoseNet,
+        # 'posenet': CocoPoseNet,
+        'posenet': PoseNet,
         'facenet': FaceNet,
         'handnet': HandNet,
         'nn1': NN1,

@@ -96,29 +96,31 @@ class Updater(StandardUpdater):
         optimizer = self.get_optimizer('main')
 
         batch = train_iter.next()
-        imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
-
-        x_data = preprocess(imgs)
-
-        if self.compute_mask:
-            pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
-        else:
-            pafs_ys, heatmaps_ys = optimizer.target(x_data)
-            masks_ys = [None] * len(pafs_ys)
-
-        loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
-            imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
-
-        reporter.report({
-            'main/loss': loss,
-            'main/paf': sum(paf_loss_log),
-            'main/heatmap': sum(heatmap_loss_log),
-            'main/mask': sum(mask_loss_log),
-        })
-
-        optimizer.target.cleargrads()
-        loss.backward()
-        optimizer.update()
+        print('hoge')
+        import ipdb; ipdb.set_trace()
+        # imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
+        #
+        # x_data = preprocess(imgs)
+        #
+        # if self.compute_mask:
+        #     pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
+        # else:
+        #     pafs_ys, heatmaps_ys = optimizer.target(x_data)
+        #     masks_ys = [None] * len(pafs_ys)
+        #
+        # loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
+        #     imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
+        #
+        # reporter.report({
+        #     'main/loss': loss,
+        #     'main/paf': sum(paf_loss_log),
+        #     'main/heatmap': sum(heatmap_loss_log),
+        #     'main/mask': sum(mask_loss_log),
+        # })
+        #
+        # optimizer.target.cleargrads()
+        # loss.backward()
+        # optimizer.update()
 
 
 class Validator(extensions.Evaluator):

@@ -360,6 +360,7 @@ class CocoDataLoader(DatasetMixin):
         return img, img_id, annotations, ignore_mask, masks
 
     def get_example(self, i):
+        return i
         img, img_id, annotations, ignore_mask, stuff_mask = self.get_img_annotation(ind=i)
 
         if self.mode == 'eval':
