@@ -100,7 +100,11 @@ class Updater(StandardUpdater):
 
         x_data = preprocess(imgs)
 
-        pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
+        if self.compute_mask:
+            pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
+        else:
+            pafs_ys, heatmaps_ys = optimizer.target(x_data)
+            mask_ys = [None] * len(pafs_ys)
 
         loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
             imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
@@ -139,7 +143,11 @@ class Validator(extensions.Evaluator):
                 with function.no_backprop_mode():
                     x_data = preprocess(imgs)
 
-                    pafs_ys, heatmaps_ys, masks_ys = model(x_data)
+                    if self.compute_mask:
+                        pafs_ys, heatmaps_ys, masks_ys = model(x_data)
+                    else:
+                        pafs_ys, heatmaps_ys = model(x_data)
+                        mask_ys = [None] * len(pafs_ys)
 
                     loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
                         imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
@@ -213,12 +221,11 @@ class Evaluator(extensions.Evaluator):
 if __name__ == '__main__':
     args = parse_args()
 
-    model = params['archs'][args.arch]()
+    model = params['archs'][args.arch](compute_mask=args.mask)
 
     if args.arch == 'posenet':
         CocoPoseNet.copy_vgg_params(model)
     elif args.arch == 'nn1':
-        model.compute_mask = True
         nn1.copy_squeezenet_params(model.squeeze)
     elif args.arch == 'resnetfpn':
         chainer.serializers.load_npz('models/resnet50.npz', model.res)

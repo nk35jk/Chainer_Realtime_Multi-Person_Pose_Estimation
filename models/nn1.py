@@ -142,7 +142,7 @@ class NN1(chainer.Chain):
     insize = 368
     downscale = 8
 
-    def __init__(self, joints=19, limbs=38, stuffs=182, stage=6, compute_mask=False):
+    def __init__(self, joints=19, limbs=38, stuffs=2, stage=6, compute_mask=False):
         super(NN1, self).__init__()
         with self.init_scope():
             self.squeeze = SqueezeNet(res=True)
