@@ -42,7 +42,7 @@ if __name__ == '__main__':
     res = []
     imgIds = []
     # for i in range(len(eval_loader)):
-    for i in range(10):
+    for i in range(100):
     # for i in [1]:
         print(i)
         img, annotations, img_id = eval_loader.get_example(i)
