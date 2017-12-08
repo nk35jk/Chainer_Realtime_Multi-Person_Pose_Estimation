@@ -60,7 +60,7 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
         mask_loss = 0
         if compute_mask:
             mask_loss = F.softmax_cross_entropy(masks_y, stage_stuff_mask)
-        total_loss += pafs_loss + heatmaps_loss + 0.01 * mask_loss
+        total_loss += pafs_loss + heatmaps_loss + 0.005 * mask_loss
 
         paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
         heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
@@ -95,6 +95,7 @@ class Updater(StandardUpdater):
         optimizer = self.get_optimizer('main')
 
         batch = train_iter.next()
+
         imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
 
         x_data = preprocess(imgs)
@@ -220,12 +221,11 @@ class Evaluator(extensions.Evaluator):
 if __name__ == '__main__':
     args = parse_args()
 
-    model = params['archs'][args.arch]()
+    model = params['archs'][args.arch](compute_mask=args.mask)
 
     if args.arch == 'posenet':
         CocoPoseNet.copy_vgg_params(model)
     elif args.arch == 'nn1':
-        model.compute_mask = True
         nn1.copy_squeezenet_params(model.squeeze)
     elif args.arch == 'resnetfpn':
         chainer.serializers.load_npz('models/resnet50.npz', model.res)

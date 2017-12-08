@@ -3,6 +3,7 @@ import sys
 import cv2
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from chainer.dataset import DatasetMixin
 from pycocotools.coco import COCO
@@ -86,8 +87,8 @@ class CocoDataLoader(DatasetMixin):
         img = img * np.repeat((ignore_mask == 0).astype(np.uint8)[:, :, None], 3, axis=2)
         return img
 
-    def overlay_stuff_mask(self, img, stuff_mask):
-        hue = stuff_mask / 181
+    def overlay_stuff_mask(self, img, stuff_mask, n_class):
+        hue = stuff_mask / (n_class - 1)
         saturation = np.ones_like(hue)
         value = saturation.copy()
         value[stuff_mask == -1] = 0
@@ -180,8 +181,7 @@ class CocoDataLoader(DatasetMixin):
         flipped_img = cv2.flip(img, 1)
         flipped_mask = cv2.flip(mask.astype(np.uint8), 1).astype('bool')
         stuff_mask = cv2.flip(stuff_mask, 1)
-        center_pos = (np.array(img.shape[:-1]) / 2).astype(np.int64)
-        joints[:, :, 0] = center_pos[0] + center_pos[0] - joints[:, :, 0]
+        joints[:, :, 0] = img.shape[1] - 1 - joints[:, :, 0]
 
         def swap_joints(joints, valid_joints, joint_type_1, joint_type_2):
             tmp = joints[:, joint_type_1, :].copy()
@@ -340,7 +340,15 @@ class CocoDataLoader(DatasetMixin):
             ignore_mask = np.zeros(img.shape[:2], 'bool')
         else:
             ignore_mask = ignore_mask == 255
-            
+
+        masks = np.ones(img.shape[:2], 'uint8')
+        for ann in annotations_for_img:
+            mask = self.coco.annToMask(ann)
+            if ann['iscrowd'] == 1:
+                masks[mask == 1] = 0
+            else:
+                masks[mask == 1] = 2
+
         stuff_path = os.path.join(params['coco_stuff_dir'], 'annotations/COCO_train2014_{:012d}.mat'.format(img_id))
         if os.path.exists(stuff_path):
             stuff_mask = loadmat(stuff_path)['S']
@@ -348,7 +356,7 @@ class CocoDataLoader(DatasetMixin):
             stuff_mask = np.zeros(ignore_mask.shape, 'uint8')
         if self.mode == 'eval':
             return img, img_id, annotations_for_img, ignore_mask, stuff_mask
-        return img, img_id, annotations, ignore_mask, stuff_mask
+        return img, img_id, annotations, ignore_mask, masks
 
     def get_example(self, i):
         img, img_id, annotations, ignore_mask, stuff_mask = self.get_img_annotation(ind=i)
@@ -366,35 +374,32 @@ class CocoDataLoader(DatasetMixin):
         return resized_img, pafs, heatmaps, ignore_mask, stuff_mask
 
 if __name__ == '__main__':
-    coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
-    data_loader = CocoDataLoader(coco)
+    mode = 'train'
+    coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
+    data_loader = CocoDataLoader(coco, mode=mode)
 
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
     count = 0
     for i in range(len(data_loader)):
-        img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=i)
-        if np.any(stuff_mask != 0):
-            count += 1
-            print(i, count)
-        # if annotations is not None:
-        #     resized_img, pafs, heatmaps, ignore_mask, stuff_mask = data_loader.generate_labels(img, annotations, ignore_mask, stuff_mask)
-        #
-        #     # resize to view
-        #     shape = (params['insize'],) * 2
-        #     pafs = cv2.resize(pafs.transpose(1, 2, 0), shape).transpose(2, 0, 1)
-        #     heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape).transpose(2, 0, 1)
-        #     ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape) > 0
-        #     stuff_mask = cv2.resize(stuff_mask, shape, interpolation=cv2.INTER_NEAREST)
-        #
-        #     # view
-        #     img = resized_img.copy()
-        #     img = data_loader.overlay_pafs(img, pafs)
-        #     img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
-        #     img = data_loader.overlay_ignore_mask(img, ignore_mask)
-        #     if np.any(stuff_mask != -1):
-        #         img = data_loader.overlay_stuff_mask(img, stuff_mask)
-        #
-        #     cv2.imshow('w', np.hstack((resized_img, img)))
-        #     k = cv2.waitKey(0)
-        #     if k == ord('q'):
-        #         sys.exit()
+        orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=i)
+        if annotations is not None:
+            resized_img, pafs, heatmaps, ignore_mask, stuff_mask = data_loader.generate_labels(orig_img, annotations, ignore_mask, stuff_mask)
+
+            # resize to view
+            shape = (params['insize'],) * 2
+            pafs = cv2.resize(pafs.transpose(1, 2, 0), shape).transpose(2, 0, 1)
+            heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape).transpose(2, 0, 1)
+            ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape) > 0
+            stuff_mask = cv2.resize(stuff_mask, shape, interpolation=cv2.INTER_NEAREST)
+
+            # view
+            img = resized_img.copy()
+            img = data_loader.overlay_pafs(img, pafs)
+            img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
+            img = data_loader.overlay_ignore_mask(img, ignore_mask)
+            # img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
+
+            cv2.imshow('w', np.hstack((resized_img, img)))
+            k = cv2.waitKey(0)
+            if k == ord('q'):
+                sys.exit()

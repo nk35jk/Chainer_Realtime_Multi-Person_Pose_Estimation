@@ -27,11 +27,11 @@ def copy_squeezenet_params(model):
 
 class Fire(chainer.Chain):
     def __init__(self, in_size, s1, e1, e3, res=False):
-        super(Fire, self).__init__(
-            squeeze1x1=L.Convolution2D(in_size, s1, 1),
-            expand1x1=L.Convolution2D(s1, e1, 1),
-            expand3x3=L.Convolution2D(s1, e3, 3, pad=1),
-        )
+        super(Fire, self).__init__()
+        with self.init_scope():
+            self.squeeze1x1 = L.Convolution2D(in_size, s1, 1)
+            self.expand1x1 = L.Convolution2D(s1, e1, 1)
+            self.expand3x3 = L.Convolution2D(s1, e3, 3, pad=1)
         self.res = res
 
     def __call__(self, x):
@@ -47,16 +47,16 @@ class Fire(chainer.Chain):
 
 class SqueezeNet(chainer.Chain):
     def __init__(self, res):
-        super(SqueezeNet, self).__init__(
-            conv1=L.Convolution2D(3, 96, 7, stride=2),
-            fire2=Fire(96, 16, 64, 64),
-            fire3=Fire(128, 16, 64, 64, res=res),
-            fire4=Fire(128, 32, 128, 128),
-            fire5=Fire(256, 32, 128, 128, res=res),
-            fire6=Fire(256, 48, 192, 192),
-            fire7=Fire(384, 48, 192, 192, res=res),
-            fire8=Fire(384, 64, 256, 256),
-        )
+        super(SqueezeNet, self).__init__()
+        with self.init_scope():
+            self.conv1 = L.Convolution2D(3, 96, 7, stride=2)
+            self.fire2 = Fire(96, 16, 64, 64)
+            self.fire3 = Fire(128, 16, 64, 64, res=res)
+            self.fire4 = Fire(128, 32, 128, 128)
+            self.fire5 = Fire(256, 32, 128, 128, res=res)
+            self.fire6 = Fire(256, 48, 192, 192)
+            self.fire7 = Fire(384, 48, 192, 192, res=res)
+            self.fire8 = Fire(384, 64, 256, 256)
 
     def __call__(self, x):
         h = F.relu(self.conv1(x))
@@ -73,36 +73,38 @@ class SqueezeNet(chainer.Chain):
 
 
 class StageN(chainer.Chain):
-    def __init__(self, joints, limbs, stuffs):
-        super(StageN, self).__init__(
-            conv1_1=L.Convolution2D(128+joints+limbs, 128, 3, stride=1, pad=1),
-            conv1_2=L.DilatedConvolution2D(128, 128, 3, stride=1, pad=2, dilate=2),
-            conv1_3=L.DilatedConvolution2D(128, 128, 3, stride=1, pad=4, dilate=4),
-            conv1_4=L.DilatedConvolution2D(128, 128, 3, stride=1, pad=8, dilate=8),
+    def __init__(self, joints, limbs, stuffs, compute_mask):
+        super(StageN, self).__init__()
+        with self.init_scope():
+            self.conv1_1 = L.Convolution2D(128+joints+limbs, 128, 3, stride=1, pad=1)
+            self.conv1_2 = L.DilatedConvolution2D(128, 128, 3, stride=1, pad=2, dilate=2)
+            self.conv1_3 = L.DilatedConvolution2D(128, 128, 3, stride=1, pad=4, dilate=4)
+            self.conv1_4 = L.DilatedConvolution2D(128, 128, 3, stride=1, pad=8, dilate=8)
 
-            conv1_L1=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv2_L1=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv3_L1=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv4_L1=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv5_L1=L.Convolution2D(128, 128, 1, stride=1, pad=0),
-            conv6_L1=L.Convolution2D(128, limbs, 1, stride=1, pad=0),
+            self.conv1_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv2_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv3_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv4_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv5_L1 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
+            self.conv6_L1 = L.Convolution2D(128, limbs, 1, stride=1, pad=0)
 
-            conv1_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv2_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv3_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv4_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv5_L2=L.Convolution2D(128, 128, 1, stride=1, pad=0),
-            conv6_L2=L.Convolution2D(128, joints, 1, stride=1, pad=0),
+            self.conv1_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv2_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv3_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv4_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv5_L2 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
+            self.conv6_L2 = L.Convolution2D(128, joints, 1, stride=1, pad=0)
 
-            conv1_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv2_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv3_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv4_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv5_L3=L.Convolution2D(128, 128, 1, stride=1, pad=0),
-            conv6_L3=L.Convolution2D(128, stuffs, 1, stride=1, pad=0),
-        )
+            if compute_mask:
+                self.conv1_L3 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+                self.conv2_L3 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+                self.conv3_L3 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+                self.conv4_L3 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+                self.conv5_L3 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
+                self.conv6_L3 = L.Convolution2D(128, stuffs, 1, stride=1, pad=0)
+        self.compute_mask = compute_mask
 
-    def __call__(self, h1, h2, h3, feature_map):
+    def __call__(self, h1, h2, feature_map):
         h = F.concat((h1, h2, feature_map), axis=1)
         h = F.relu(self.conv1_1(h))
         h = F.relu(self.conv1_2(h))
@@ -123,13 +125,15 @@ class StageN(chainer.Chain):
         h2 = F.relu(self.conv5_L2(h2))
         h2 = self.conv6_L2(h2)
 
-        h3 = F.relu(self.conv1_L3(h))
-        h3 = F.relu(self.conv2_L3(h3))
-        h3 = F.relu(self.conv3_L3(h3))
-        h3 = F.relu(self.conv4_L3(h3))
-        h3 = F.relu(self.conv5_L3(h3))
-        h3 = self.conv6_L3(h3)
-        return h1, h2, h3
+        if self.compute_mask:
+            h3 = F.relu(self.conv1_L3(h))
+            h3 = F.relu(self.conv2_L3(h3))
+            h3 = F.relu(self.conv3_L3(h3))
+            h3 = F.relu(self.conv4_L3(h3))
+            h3 = F.relu(self.conv5_L3(h3))
+            h3 = self.conv6_L3(h3)
+            return h1, h2, h3
+        return h1, h2
 
 
 class NN1(chainer.Chain):
@@ -138,35 +142,38 @@ class NN1(chainer.Chain):
     insize = 368
     downscale = 8
 
-    def __init__(self, joints=19, limbs=38, stuffs=182, stage=6, compute_mask=False):
-        super(NN1, self).__init__(
-            squeeze=SqueezeNet(res=True),
-            conv1_1=L.Convolution2D(512, 256, 3, stride=1, pad=1),
-            conv1_2=L.Convolution2D(256, 128, 3, stride=1, pad=1),
-            bn1=L.BatchNormalization(128),
+    def __init__(self, joints=19, limbs=38, stuffs=2, stage=6, compute_mask=False):
+        super(NN1, self).__init__()
+        with self.init_scope():
+            self.squeeze = SqueezeNet(res=True)
+            self.conv1_1 = L.Convolution2D(512, 256, 3, stride=1, pad=1)
+            self.conv1_2 = L.Convolution2D(256, 128, 3, stride=1, pad=1)
+            self.bn1 = L.BatchNormalization(128)
 
             # stage1
-            conv1_L1=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv2_L1=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv3_L1=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv4_L1=L.Convolution2D(128, 512, 1, stride=1, pad=0),
-            conv5_L1=L.Convolution2D(512, limbs, 1, stride=1, pad=0),
+            self.conv1_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv2_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv3_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv4_L1 = L.Convolution2D(128, 512, 1, stride=1, pad=0)
+            self.conv5_L1 = L.Convolution2D(512, limbs, 1, stride=1, pad=0)
 
-            conv1_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv2_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv3_L2=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv4_L2=L.Convolution2D(128, 512, 1, stride=1, pad=0),
-            conv5_L2=L.Convolution2D(512, joints, 1, stride=1, pad=0),
+            self.conv1_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv2_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv3_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+            self.conv4_L2 = L.Convolution2D(128, 512, 1, stride=1, pad=0)
+            self.conv5_L2 = L.Convolution2D(512, joints, 1, stride=1, pad=0)
 
-            conv1_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv2_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv3_L3=L.Convolution2D(128, 128, 3, stride=1, pad=1),
-            conv4_L3=L.Convolution2D(128, 512, 1, stride=1, pad=0),
-            conv5_L3=L.Convolution2D(512, stuffs, 1, stride=1, pad=0),
-        )
-        links = [('stage{}'.format(i), StageN(joints, limbs, stuffs)) for i in range(2, stage+1)]
+            if compute_mask:
+                self.conv1_L3 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+                self.conv2_L3 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+                self.conv3_L3 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
+                self.conv4_L3 = L.Convolution2D(128, 512, 1, stride=1, pad=0)
+                self.conv5_L3 = L.Convolution2D(512, stuffs, 1, stride=1, pad=0)
+
+        links = [('stage{}'.format(i), StageN(joints, limbs, stuffs, compute_mask)) for i in range(2, stage+1)]
         [self.add_link(*l) for l in links]
         self.stagen = links
+        self.compute_mask = compute_mask
 
     def __call__(self, x):
         y1s, y2s, y3s = [], [], []
@@ -205,14 +212,20 @@ class NN1(chainer.Chain):
         # stage2~
         for name, stage in self.stagen:
             st = time.time()
-            h1, h2, h3 = stage(h1, h2, h3, feature_map)
-            y1s.append(h1)
-            y2s.append(h2)
             if self.compute_mask:
+                h1, h2, h3 = stage(h1, h2, feature_map)
+                y1s.append(h1)
+                y2s.append(h2)
                 y3s.append(h3)
+            else:
+                h1, h2 = stage(h1, h2, feature_map)
+                y1s.append(h1)
+                y2s.append(h2)
             # print('{}: {:.4f}s'.format(name, time.time() - st))
         # print('forward: {:.4f}s'.format(time.time() - st1))
-        return y1s, y2s, y3s
+        if self.compute_mask:
+            return y1s, y2s, y3s
+        return y1s, y2s
 
 if __name__ == '__main__':
     model = NN1()
