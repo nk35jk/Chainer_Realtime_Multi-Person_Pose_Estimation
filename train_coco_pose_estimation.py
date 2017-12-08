@@ -5,6 +5,7 @@ import json
 import glob
 import random
 import numpy as np
+import multiprocessing
 import matplotlib.pyplot as plt
 
 from pycocotools.coco import COCO
@@ -19,9 +20,7 @@ from entity import JointType, params, parse_args
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
-from models import CocoPoseNet
-from models import nn1
-from models import resnetfpn
+from models import CocoPoseNet, nn1, resnetfpn
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignore_mask, stuff_mask, compute_mask, device):
@@ -100,7 +99,11 @@ class Updater(StandardUpdater):
 
         x_data = preprocess(imgs)
 
-        pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
+        if self.compute_mask:
+            pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
+        else:
+            pafs_ys, heatmaps_ys = optimizer.target(x_data)
+            masks_ys = [None] * len(pafs_ys)
 
         loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
             imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
@@ -139,7 +142,11 @@ class Validator(extensions.Evaluator):
                 with function.no_backprop_mode():
                     x_data = preprocess(imgs)
 
-                    pafs_ys, heatmaps_ys, masks_ys = model(x_data)
+                    if self.compute_mask:
+                        pafs_ys, heatmaps_ys, masks_ys = model(x_data)
+                    else:
+                        pafs_ys, heatmaps_ys = model(x_data)
+                        masks_ys = [None] * len(pafs_ys)
 
                     loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
                         imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
@@ -238,18 +245,19 @@ if __name__ == '__main__':
     eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=args.eval_samples)
 
     if args.loaderjob:
+        multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug
         train_iter = chainer.iterators.MultiprocessIterator(
             train_loader, args.batchsize, n_processes=args.loaderjob)
         val_iter = chainer.iterators.MultiprocessIterator(
             val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
-        eval_iter = chainer.iterators.MultiprocessIterator(
-            eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False)
+        # eval_iter = chainer.iterators.MultiprocessIterator(
+        #     eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False)
     else:
         train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
         val_iter = chainer.iterators.SerialIterator(
             val_loader, args.valbatchsize, repeat=False, shuffle=False)
-        eval_iter = chainer.iterators.SerialIterator(
-            eval_loader, 1, repeat=False, shuffle=False)
+        # eval_iter = chainer.iterators.SerialIterator(
+        #     eval_loader, 1, repeat=False, shuffle=False)
 
     # Set up an optimizer
     # optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
@@ -259,6 +267,7 @@ if __name__ == '__main__':
 
     # Set up a trainer
     updater = Updater(train_iter, model, optimizer, args.mask, device=args.gpu)
+    # updater = Updater2(train_iter, model, optimizer, args.mask, devices={'main': 0, 'second': 1})
     trainer = training.Trainer(updater, (args.iteration, 'iteration'), args.out)
 
     val_interval = (10 if args.test else 1000), 'iteration'

@@ -41,8 +41,8 @@ if __name__ == '__main__':
     res = []
     imgIds = []
     # for i in range(len(eval_loader)):
-    # for i in range(10):
-    for i in [1]:
+    for i in range(100):
+    # for i in [1]:
         print(i)
         img, annotations, img_id = eval_loader.get_example(i)
 
@@ -76,10 +76,8 @@ if __name__ == '__main__':
             # gt_poses = np.array([np.array(ann['keypoints']).reshape(-1, 3) for ann in annotations])
             # img = draw_person_pose(img, gt_poses)
 
-            cv2.imshow('results', img)
-            cv2.waitKey(1)
-
-        import ipdb; ipdb.set_trace()
+            # cv2.imshow('results', img)
+            # cv2.waitKey(1)
 
         # # GT (test)
         # for ann in annotations:

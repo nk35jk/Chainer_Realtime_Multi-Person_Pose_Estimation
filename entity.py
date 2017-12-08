@@ -66,8 +66,8 @@ params = {
     'downscale': 8,
 
     'inference_img_size': 368,
-    # 'inference_scales': [0.5, 1, 1.5, 2],
-    'inference_scales': [1.0],
+    'inference_scales': [0.5, 1, 1.5, 2],
+    # 'inference_scales': [1.0],
     'heatmap_size': 320,
     'gaussian_sigma': 2.5,
     'ksize': 17,
@@ -76,7 +76,7 @@ params = {
     'heatmap_peak_thresh': 0.1,
     'inner_product_thresh': 0.05,
     'length_penalty_ratio': 0.5,
-    'n_subset_limbs_thresh': 4,
+    'n_subset_limbs_thresh': 7,
     'subset_score_thresh': 0.4,
     'limbs_point': [
         [JointType.Neck, JointType.RightWaist],
