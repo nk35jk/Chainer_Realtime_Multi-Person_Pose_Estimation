@@ -13,15 +13,15 @@ from models.CocoPoseNet import CocoPoseNet
 
 
 class PoseDetector(object):
-    def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False):
+    def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False, compute_mask=False):
         self.arch = arch
         self.precise = precise
         if model is not None:
             self.model = model
         else:
             # load model
-            print('Loading PoseNet...')
-            self.model = params['archs'][arch]()
+            print('Loading the model...')
+            self.model = params['archs'][arch](compute_mask=compute_mask)
             if weights_file:
                 serializers.load_npz(weights_file, self.model)
 
@@ -578,7 +578,7 @@ if __name__ == '__main__':
     chainer.config.train = False
 
     # load model
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=False)
 
     while True:
         # read image

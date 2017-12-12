@@ -320,7 +320,7 @@ class CocoDataLoader(DatasetMixin):
             valid_annotations_for_img = []
             for annotation in annotations_for_img:
                 # if too few keypoints or too small
-                if annotation['num_keypoints'] >= 5 and annotation['area'] > 48 * 48:
+                if annotation['num_keypoints'] >= 5 and annotation['area'] > 32 * 32:
                     person_cnt += 1
                     valid_annotations_for_img.append(annotation)
 
@@ -355,7 +355,7 @@ class CocoDataLoader(DatasetMixin):
         else:
             stuff_mask = np.zeros(ignore_mask.shape, 'uint8')
         if self.mode == 'eval':
-            return img, img_id, annotations_for_img, ignore_mask, stuff_mask
+            return img, img_id, annotations_for_img, ignore_mask, masks
         return img, img_id, annotations, ignore_mask, masks
 
     def get_example(self, i):
