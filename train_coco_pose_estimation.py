@@ -242,7 +242,7 @@ if __name__ == '__main__':
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
     train_loader = CocoDataLoader(coco_train, mode='train')
     val_loader = CocoDataLoader(coco_val, mode='val', n_samples=args.val_samples)
-    eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=args.eval_samples)
+    # eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=args.eval_samples)
 
     if args.loaderjob:
         multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug
