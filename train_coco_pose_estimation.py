@@ -94,8 +94,6 @@ class Updater(StandardUpdater):
         train_iter = self.get_iterator('main')
         optimizer = self.get_optimizer('main')
 
-        print(self.iteration)
-
         # Update base network parameters
         if self.iteration == 2000:
             if args.arch == 'posenet':
