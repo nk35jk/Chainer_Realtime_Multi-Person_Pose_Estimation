@@ -60,13 +60,16 @@ params = {
         'nn1': NN1,
         'resnetfpn': ResNetFPN,
     },
+    # training params
     'paf_sigma': 8,
     'heatmap_sigma': 7,
     'crop_iob_thresh': 0.4,
     'crop_size': 480,
     'insize': 368,
     'downscale': 8,
+    'mask_loss_ratio': 0.005,
 
+    # inference params
     'inference_img_size': 368,
     'inference_scales': [0.5, 1, 1.5, 2],
     # 'inference_scales': [1.0],
@@ -156,7 +159,7 @@ def parse_args():
                         help='Model architecture')
     parser.add_argument('--batchsize', '-B', type=int, default=10,
                         help='Learning minibatch size')
-    parser.add_argument('--valbatchsize', '-b', type=int, default=10,
+    parser.add_argument('--valbatchsize', '-b', type=int, default=4,
                         help='Validation minibatch size')
     parser.add_argument('--val_samples', type=int, default=100,
                         help='Number of validation samples')

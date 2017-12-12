@@ -60,7 +60,7 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
         mask_loss = 0
         if compute_mask:
             mask_loss = F.softmax_cross_entropy(masks_y, stage_stuff_mask)
-        total_loss += pafs_loss + heatmaps_loss + 0.005 * mask_loss
+        total_loss += pafs_loss + heatmaps_loss + params['mask_loss_ratio'] * mask_loss
 
         paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
         heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
@@ -112,7 +112,7 @@ class Updater(StandardUpdater):
         reporter.report({
             'main/loss': loss,
             'main/paf': sum(paf_loss_log),
-            'main/heatmap': sum(heatmap_loss_log),
+            'main/heat': sum(heatmap_loss_log),
             'main/mask': sum(mask_loss_log),
         })
 
@@ -153,7 +153,7 @@ class Validator(extensions.Evaluator):
                         imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
                     observation['val/loss'] = cuda.to_cpu(loss.data)
                     observation['val/paf'] = sum(paf_loss_log)
-                    observation['val/heatmap'] = sum(heatmap_loss_log)
+                    observation['val/heat'] = sum(heatmap_loss_log)
                     observation['val/mask'] = sum(mask_loss_log)
             summary.add(observation)
         return summary.compute_mean()
@@ -284,7 +284,7 @@ if __name__ == '__main__':
     trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
-        'main/heatmap', 'val/heatmap', 'main/mask', 'val/mask',
+        'main/heat', 'val/heat', 'main/mask', 'val/mask',
     ]), trigger=log_interval)
     trainer.extend(extensions.ProgressBar(update_interval=1))
 
