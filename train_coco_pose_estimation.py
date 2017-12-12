@@ -20,7 +20,7 @@ from entity import JointType, params, parse_args
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
-from models import CocoPoseNet, nn1, resnetfpn
+from models import CocoPoseNet, posenet, nn1, resnetfpn
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignore_mask, stuff_mask, compute_mask, device):
@@ -93,6 +93,18 @@ class Updater(StandardUpdater):
     def update_core(self):
         train_iter = self.get_iterator('main')
         optimizer = self.get_optimizer('main')
+
+        print(self.iteration)
+
+        # Update base network parameters
+        if self.iteration == 2000:
+            if args.arch == 'posenet':
+                layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                               'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
+                for layer_name in layer_names:
+                    optimizer.target[layer_name].enable_update()
+            elif args.arch == 'resnetfpn':
+                optimizer.target.res.enable_update()
 
         batch = train_iter.next()
 
@@ -224,11 +236,18 @@ if __name__ == '__main__':
     model = params['archs'][args.arch](compute_mask=args.mask)
 
     if args.arch == 'posenet':
-        CocoPoseNet.copy_vgg_params(model)
+        posenet.copy_vgg_params(model)
+        # layer_names = [
+        #     'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+        #     'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
+        # ]
+        # for layer_name in layer_names:
+        #     model[layer_name].disable_update()
     elif args.arch == 'nn1':
         nn1.copy_squeezenet_params(model.squeeze)
     elif args.arch == 'resnetfpn':
         chainer.serializers.load_npz('models/resnet50.npz', model.res)
+        # model.res.disable_update()
 
     if args.initmodel:
         print('Load model from', args.initmodel)
@@ -260,10 +279,19 @@ if __name__ == '__main__':
         #     eval_loader, 1, repeat=False, shuffle=False)
 
     # Set up an optimizer
-    optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
-    # optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
+    # optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
+    optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
-    optimizer.add_hook(chainer.optimizer.WeightDecay(5e-4))
+    # optimizer.add_hook(chainer.optimizer.WeightDecay(5e-4))
+
+    # Fix base network parameters
+    if args.arch == 'posenet':
+        layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                       'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
+        for layer_name in layer_names:
+            model[layer_name].disable_update()
+    elif args.arch == 'resnetfpn':
+        model.res.disable_update()
 
     # Set up a trainer
     updater = Updater(train_iter, model, optimizer, args.mask, device=args.gpu)

@@ -39,7 +39,6 @@ class PoseNet(chainer.Chain):
             self.conv4_3_CPM = L.Convolution2D(512, 256, 3, stride=1, pad=1)
             self.conv4_4_CPM = L.Convolution2D(256, 128, 3, stride=1, pad=1)
 
-            # stage1
             self.conv5_1_CPM_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
             self.conv5_2_CPM_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
             self.conv5_3_CPM_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
