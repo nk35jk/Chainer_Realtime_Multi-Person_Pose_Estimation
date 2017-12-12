@@ -63,6 +63,7 @@ params = {
     # training params
     'paf_sigma': 8,
     'heatmap_sigma': 7,
+    'max_rotate_degree': 40,
     'crop_iob_thresh': 0.4,
     'crop_size': 480,
     'insize': 368,

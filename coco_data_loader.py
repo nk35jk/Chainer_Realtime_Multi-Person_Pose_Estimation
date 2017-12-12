@@ -1,6 +1,7 @@
 import os
 import sys
 import cv2
+import math
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,35 +26,6 @@ class CocoDataLoader(DatasetMixin):
 
     def __len__(self):
         return len(self.imgIds)
-
-    # return shape: (height, width)
-    def gen_gaussian_heatmap(self, imshape, joint, sigma):
-        x, y = joint
-        grid_x = np.tile(np.arange(imshape[1]), (imshape[0], 1))
-        grid_y = np.tile(np.arange(imshape[0]), (imshape[1], 1)).transpose()
-        grid_distance = (grid_x - x) ** 2 + (grid_y - y) ** 2
-        gaussian_heatmap = np.exp(-0.5 * grid_distance / sigma**2)
-        return gaussian_heatmap
-
-    # return shape: (2, height, width)
-    def gen_constant_paf(self, imshape, joint_from, joint_to, paf_width):
-        if np.array_equal(joint_from, joint_to): # same joint
-            return np.zeros((2,) + imshape[:-1])
-
-        joint_distance = np.linalg.norm(joint_to - joint_from)
-        unit_vector = (joint_to - joint_from) / joint_distance
-        rad = np.pi / 2
-        rot_matrix = np.array([[np.cos(rad), np.sin(rad)], [-np.sin(rad), np.cos(rad)]])
-        vertical_unit_vector = np.dot(rot_matrix, unit_vector)
-        grid_x = np.tile(np.arange(imshape[1]), (imshape[0], 1))
-        grid_y = np.tile(np.arange(imshape[0]), (imshape[1], 1)).transpose()
-        horizontal_inner_product = unit_vector[0] * (grid_x - joint_from[0]) + unit_vector[1] * (grid_y - joint_from[1])
-        horizontal_paf_flag = (0 <= horizontal_inner_product) & (horizontal_inner_product <= joint_distance)
-        vertical_inner_product = vertical_unit_vector[0] * (grid_x - joint_from[0]) + vertical_unit_vector[1] * (grid_y - joint_from[1])
-        vertical_paf_flag = np.abs(vertical_inner_product) <= paf_width
-        paf_flag = horizontal_paf_flag & vertical_paf_flag
-        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, imshape[:-1] + (2,)).transpose(2, 0, 1)
-        return constant_paf
 
     def overlay_paf(self, img, paf):
         hue = ((np.arctan2(paf[1], paf[0]) / np.pi) / -2 + 0.5)
@@ -96,6 +68,25 @@ class CocoDataLoader(DatasetMixin):
         rgb_hsv_stuff_mask = cv2.cvtColor((hsv_stuff_mask * 255).astype(np.uint8), cv2.COLOR_HSV2BGR)
         img = cv2.addWeighted(img, 0.3, rgb_hsv_stuff_mask, 0.7, 0)
         return img
+
+    def random_rotate_img(self, img, mask, stuff_mask, joints, max_rotate_degree):
+        h, w, _ = img.shape
+        r = random.random()
+        degree = (r - 0.5) * 2 * max_rotate_degree
+        rad = degree * math.pi / 180
+        center = (w / 2, h / 2)
+        R = cv2.getRotationMatrix2D(center, degree, 1)
+        bbox = (w*abs(math.cos(rad)) + h*abs(math.sin(rad)), w*abs(math.sin(rad)) + h*abs(math.cos(rad)))
+        R[0, 2] += bbox[0] / 2 - center[0]
+        R[1, 2] += bbox[1] / 2 - center[1]
+        rotate_img = cv2.warpAffine(img, R, (round(bbox[0]), round(bbox[1])), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(104, 117, 123))
+        rotate_mask = cv2.warpAffine(mask.astype('uint8')*255, R, (round(bbox[0]), round(bbox[1]))) > 0
+        rotate_stuff_mask = cv2.warpAffine(stuff_mask, R, (round(bbox[0]), round(bbox[1])), flags=cv2.INTER_NEAREST)
+
+        tmp_joints = np.ones((joints.shape[0], joints.shape[1], 3))
+        tmp_joints[:, :, :2] = joints.copy()
+        rotate_joints = np.dot(tmp_joints, R.T)  # apply rotation matrix to the joints
+        return rotate_img, rotate_mask, rotate_stuff_mask, rotate_joints
 
     def compute_intersection(self, box1, box2):
         intersection_width =  np.minimum(box1[1][0], box2[1][0]) - np.maximum(box1[0][0], box2[0][0])
@@ -141,7 +132,7 @@ class CocoDataLoader(DatasetMixin):
             crop_bottom = crop_top + crop_height
 
             valid_iob_list, iob_list = self.validate_crop_area([[crop_left, crop_top], [crop_right, crop_bottom]], joint_bboxes, params['crop_iob_thresh'])
-            if (sum(valid_iob_list) == len(valid_iob_list)) or iteration > 10:
+            if np.all(valid_iob_list) or iteration > 10:
                 break
 
         cropped_img = orig_img[crop_top:crop_bottom, crop_left:crop_right]
@@ -150,6 +141,7 @@ class CocoDataLoader(DatasetMixin):
         joints[:, :, 0][valid_joints] -= crop_left
         joints[:, :, 1][valid_joints] -= crop_top
         valid_joints[iob_list == 0, :] = False
+
         return cropped_img, ignore_mask, stuff_mask, joints, valid_joints
 
     # distort image color
@@ -177,7 +169,6 @@ class CocoDataLoader(DatasetMixin):
         return resized_img, ignore_mask, joints, stuff_mask
 
     def flip_img(self, img, mask, stuff_mask, joints, valid_joints):
-        """flip img"""
         flipped_img = cv2.flip(img, 1)
         flipped_mask = cv2.flip(mask.astype(np.uint8), 1).astype('bool')
         stuff_mask = cv2.flip(stuff_mask, 1)
@@ -205,22 +196,34 @@ class CocoDataLoader(DatasetMixin):
 
     def augment_data(self, orig_img, ignore_mask, joints, valid_joints, stuff_mask, joint_bboxes, min_crop_size):
         """augment data"""
+        aug_img = orig_img.copy()
 
-        augmented_img = orig_img.copy()
-        augmented_mask = ignore_mask.copy()
+        aug_img, ignore_mask, stuff_mask, joints = self.random_rotate_img(
+            aug_img, ignore_mask, stuff_mask, joints, params['max_rotate_degree'])
+
         box_sizes = np.linalg.norm(joint_bboxes[:, 1] - joint_bboxes[:, 0], axis=1)
         min_crop_size = np.min((min(orig_img.shape[:-1]), min_crop_size, int(box_sizes.min() * 5)))
-        augmented_img, augmented_mask, stuff_mask, joints, valid_joints = self.random_crop_img(
-            augmented_img, augmented_mask, stuff_mask, joints, valid_joints, joint_bboxes, min_crop_size)
+        aug_img, ignore_mask, stuff_mask, joints, valid_joints = self.random_crop_img(
+            aug_img, ignore_mask, stuff_mask, joints, valid_joints, joint_bboxes, min_crop_size)
 
         # distort color
-        augmented_img = self.distort_color(augmented_img)
+        aug_img = self.distort_color(aug_img)
 
         # flip image
         if np.random.randint(2):
-            augmented_img, augmented_mask, stuff_mask, joints, valid_joints = self.flip_img(augmented_img, augmented_mask, stuff_mask, joints, valid_joints)
+            aug_img, ignore_mask, stuff_mask, joints, valid_joints = self.flip_img(
+                aug_img, ignore_mask, stuff_mask, joints, valid_joints)
 
-        return augmented_img, augmented_mask, joints, valid_joints, stuff_mask
+        return aug_img, ignore_mask, joints, valid_joints, stuff_mask
+
+    # return shape: (height, width)
+    def gen_gaussian_heatmap(self, imshape, joint, sigma):
+        x, y = joint
+        grid_x = np.tile(np.arange(imshape[1]), (imshape[0], 1))
+        grid_y = np.tile(np.arange(imshape[0]), (imshape[1], 1)).transpose()
+        grid_distance = (grid_x - x) ** 2 + (grid_y - y) ** 2
+        gaussian_heatmap = np.exp(-0.5 * grid_distance / sigma**2)
+        return gaussian_heatmap
 
     def compute_heatmaps(self, img, joints, valid_joints, heatmap_sigma):
         """compute heatmaps"""
@@ -238,6 +241,26 @@ class CocoDataLoader(DatasetMixin):
         bg_heatmap = 1 - sum_heatmap  # background channel
         heatmaps = np.vstack((heatmaps, bg_heatmap[None]))
         return heatmaps.astype('f')
+
+    # return shape: (2, height, width)
+    def gen_constant_paf(self, imshape, joint_from, joint_to, paf_width):
+        if np.array_equal(joint_from, joint_to): # same joint
+            return np.zeros((2,) + imshape[:-1])
+
+        joint_distance = np.linalg.norm(joint_to - joint_from)
+        unit_vector = (joint_to - joint_from) / joint_distance
+        rad = np.pi / 2
+        rot_matrix = np.array([[np.cos(rad), np.sin(rad)], [-np.sin(rad), np.cos(rad)]])
+        vertical_unit_vector = np.dot(rot_matrix, unit_vector)
+        grid_x = np.tile(np.arange(imshape[1]), (imshape[0], 1))
+        grid_y = np.tile(np.arange(imshape[0]), (imshape[1], 1)).transpose()
+        horizontal_inner_product = unit_vector[0] * (grid_x - joint_from[0]) + unit_vector[1] * (grid_y - joint_from[1])
+        horizontal_paf_flag = (0 <= horizontal_inner_product) & (horizontal_inner_product <= joint_distance)
+        vertical_inner_product = vertical_unit_vector[0] * (grid_x - joint_from[0]) + vertical_unit_vector[1] * (grid_y - joint_from[1])
+        vertical_paf_flag = np.abs(vertical_inner_product) <= paf_width
+        paf_flag = horizontal_paf_flag & vertical_paf_flag
+        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, imshape[:-1] + (2,)).transpose(2, 0, 1)
+        return constant_paf
 
     def compute_pafs(self, img, joints, valid_joints, paf_sigma):
         """compute pafs"""
@@ -257,52 +280,6 @@ class CocoDataLoader(DatasetMixin):
             paf[paf_flags > 0] /= paf_flags[paf_flags > 0]
             pafs = np.vstack((pafs, paf))
         return pafs.astype('f')
-
-    def parse_coco_annotation(self, img, annotations):
-        """coco annotation dataのアノテーションをjoints配列に変換"""
-        joints = np.zeros((0, len(JointType), 2), dtype=np.int32)
-        valid_joints = np.zeros((0, len(JointType)), dtype=np.bool)
-        joint_bboxes = np.zeros((0, 2, 2), np.int32)
-
-        for annotation in annotations:
-            person_joints = np.zeros((1, len(JointType), 2), dtype=np.int32)
-            person_valid_joints = np.zeros((1, len(JointType)), dtype=np.bool)
-            person_joint_bbox = np.array([[[np.iinfo(np.int32).max, np.iinfo(np.int32).max], [np.iinfo(np.int32).min, np.iinfo(np.int32).min]]], np.int32)
-
-            # convert joints position
-            for i, joint_index in enumerate(params['coco_joint_indices']):
-                valid_joint = bool(annotation['keypoints'][i * 3 + 2])
-                if valid_joint:
-                    person_valid_joints[0][joint_index] = True
-                    person_joints[0][joint_index][0] = annotation['keypoints'][i * 3]
-                    person_joints[0][joint_index][1] = annotation['keypoints'][i * 3 + 1]
-                    person_joint_bbox[0][0][0] = np.minimum(person_joint_bbox[0][0][0],  person_joints[0][joint_index][0]) # left
-                    person_joint_bbox[0][0][1] = np.minimum(person_joint_bbox[0][0][1],  person_joints[0][joint_index][1]) # top
-                    person_joint_bbox[0][1][0] = np.maximum(person_joint_bbox[0][1][0],  person_joints[0][joint_index][0]) # right
-                    person_joint_bbox[0][1][1] = np.maximum(person_joint_bbox[0][1][1],  person_joints[0][joint_index][1]) # bottom
-
-            # compute neck position
-            if bool(person_valid_joints[0][JointType.LeftShoulder]) and bool(person_valid_joints[0][JointType.RightShoulder]):
-                person_valid_joints[0][JointType.Neck] = True
-                person_joints[0][JointType.Neck][0] = int((person_joints[0][JointType.LeftShoulder][0] + person_joints[0][JointType.RightShoulder][0]) / 2)
-                person_joints[0][JointType.Neck][1] = int((person_joints[0][JointType.LeftShoulder][1] + person_joints[0][JointType.RightShoulder][1]) / 2)
-
-            joints = np.vstack((joints, person_joints))
-            valid_joints = np.vstack((valid_joints, person_valid_joints))
-            joint_bboxes = np.vstack((joint_bboxes, person_joint_bbox))
-
-        return joints, valid_joints, joint_bboxes
-
-    def generate_labels(self, img, annotations, ignore_mask, stuff_mask):
-        joints, valid_joints, joint_bboxes = self.parse_coco_annotation(img, annotations)
-        stuff_mask = stuff_mask.astype('i') - 1
-        if self.mode != 'eval':
-            img, ignore_mask, joints, valid_joints, stuff_mask = self.augment_data(img, ignore_mask, joints, valid_joints, stuff_mask, joint_bboxes, params['crop_size'])
-        resized_img, ignore_mask, resized_joints, resized_stuff = self.resize_data(img, ignore_mask, joints, stuff_mask, shape=(params['insize'], params['insize']))
-
-        heatmaps = self.compute_heatmaps(resized_img, resized_joints, valid_joints, params['heatmap_sigma'])
-        pafs = self.compute_pafs(resized_img, resized_joints, valid_joints, params['paf_sigma'])
-        return resized_img, pafs, heatmaps, ignore_mask, resized_stuff
 
     def get_img_annotation(self, ind=None, img_id=None):
         """インデックスまたは img_id から coco annotation dataを抽出、条件に満たない場合はNoneを返す """
@@ -358,6 +335,52 @@ class CocoDataLoader(DatasetMixin):
             return img, img_id, annotations_for_img, ignore_mask, masks
         return img, img_id, annotations, ignore_mask, masks
 
+    def parse_coco_annotation(self, img, annotations):
+        """coco annotation dataのアノテーションをjoints配列に変換"""
+        joints = np.zeros((0, len(JointType), 2), dtype=np.int32)
+        valid_joints = np.zeros((0, len(JointType)), dtype=np.bool)
+        joint_bboxes = np.zeros((0, 2, 2), np.int32)
+
+        for ann in annotations:
+            person_joints = np.zeros((1, len(JointType), 2), dtype=np.int32)
+            person_valid_joints = np.zeros((1, len(JointType)), dtype=np.bool)
+            person_joint_bbox = np.array([[[np.iinfo(np.int32).max, np.iinfo(np.int32).max], [np.iinfo(np.int32).min, np.iinfo(np.int32).min]]], np.int32)
+
+            # convert joints position
+            for i, joint_index in enumerate(params['coco_joint_indices']):
+                valid_joint = bool(ann['keypoints'][i * 3 + 2])
+                if valid_joint:
+                    person_valid_joints[0][joint_index] = True
+                    person_joints[0][joint_index][0] = ann['keypoints'][i * 3]
+                    person_joints[0][joint_index][1] = ann['keypoints'][i * 3 + 1]
+                    person_joint_bbox[0][0][0] = np.minimum(person_joint_bbox[0][0][0],  person_joints[0][joint_index][0]) # left
+                    person_joint_bbox[0][0][1] = np.minimum(person_joint_bbox[0][0][1],  person_joints[0][joint_index][1]) # top
+                    person_joint_bbox[0][1][0] = np.maximum(person_joint_bbox[0][1][0],  person_joints[0][joint_index][0]) # right
+                    person_joint_bbox[0][1][1] = np.maximum(person_joint_bbox[0][1][1],  person_joints[0][joint_index][1]) # bottom
+
+            # compute neck position
+            if bool(person_valid_joints[0][JointType.LeftShoulder]) and bool(person_valid_joints[0][JointType.RightShoulder]):
+                person_valid_joints[0][JointType.Neck] = True
+                person_joints[0][JointType.Neck][0] = int((person_joints[0][JointType.LeftShoulder][0] + person_joints[0][JointType.RightShoulder][0]) / 2)
+                person_joints[0][JointType.Neck][1] = int((person_joints[0][JointType.LeftShoulder][1] + person_joints[0][JointType.RightShoulder][1]) / 2)
+
+            joints = np.vstack((joints, person_joints))
+            valid_joints = np.vstack((valid_joints, person_valid_joints))
+            joint_bboxes = np.vstack((joint_bboxes, person_joint_bbox))
+
+        return joints, valid_joints, joint_bboxes
+
+    def generate_labels(self, img, annotations, ignore_mask, stuff_mask):
+        joints, valid_joints, joint_bboxes = self.parse_coco_annotation(img, annotations)
+        stuff_mask = stuff_mask.astype('i') - 1
+        if self.mode != 'eval':
+            img, ignore_mask, joints, valid_joints, stuff_mask = self.augment_data(img, ignore_mask, joints, valid_joints, stuff_mask, joint_bboxes, params['crop_size'])
+        resized_img, ignore_mask, resized_joints, resized_stuff = self.resize_data(img, ignore_mask, joints, stuff_mask, shape=(params['insize'], params['insize']))
+
+        heatmaps = self.compute_heatmaps(resized_img, resized_joints, valid_joints, params['heatmap_sigma'])
+        pafs = self.compute_pafs(resized_img, resized_joints, valid_joints, params['paf_sigma'])
+        return resized_img, pafs, heatmaps, ignore_mask, resized_stuff
+
     def get_example(self, i):
         img, img_id, annotations, ignore_mask, stuff_mask = self.get_img_annotation(ind=i)
 
@@ -381,7 +404,7 @@ if __name__ == '__main__':
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
     count = 0
     for i in range(len(data_loader)):
-        orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=i)
+        orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=random.randint(0, len(data_loader)))
         if annotations is not None:
             resized_img, pafs, heatmaps, ignore_mask, stuff_mask = data_loader.generate_labels(orig_img, annotations, ignore_mask, stuff_mask)
 
@@ -400,6 +423,6 @@ if __name__ == '__main__':
             # img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
 
             cv2.imshow('w', np.hstack((resized_img, img)))
-            k = cv2.waitKey(0)
+            k = cv2.waitKey(1)
             if k == ord('q'):
                 sys.exit()
