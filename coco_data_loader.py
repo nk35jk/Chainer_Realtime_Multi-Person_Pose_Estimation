@@ -76,12 +76,13 @@ class CocoDataLoader(DatasetMixin):
 
         min_scale = min((params['target_dist']*params['insize'])/bbox_sizes.min(), 1)
         max_scale = max((params['target_dist']*params['insize'])/bbox_sizes.max(), 1)
-        print(min_scale, max_scale)
+        # print(min_scale, max_scale)
 
         r = random.random()
         scale = float((max_scale - min_scale) * r + min_scale)
         shape = (round(w * scale), round(h * scale))
-        print(shape)
+        # print(img.shape)
+        # print(shape)
 
         resized_img, resized_mask, resized_joints, resized_stuff = self.resize_data(img, ignore_mask, joints, stuff_mask, shape)
         return resized_img, resized_mask, resized_stuff, joints
@@ -376,7 +377,6 @@ class CocoDataLoader(DatasetMixin):
 
         # if no annotations are available
         while annotations is None:
-            print('annotation is None')
             img_id = self.imgIds[np.random.randint(len(self))]
             img, img_id, annotations, ignore_mask, stuff_mask = self.get_img_annotation(img_id=img_id)
 
