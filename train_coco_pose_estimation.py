@@ -260,10 +260,10 @@ if __name__ == '__main__':
         #     eval_loader, 1, repeat=False, shuffle=False)
 
     # Set up an optimizer
-    # optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
-    optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
+    optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
+    # optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
-    # optimizer.add_hook(chainer.optimizer.WeightDecay(5e-4))
+    optimizer.add_hook(chainer.optimizer.WeightDecay(5e-4))
 
     # Set up a trainer
     updater = Updater(train_iter, model, optimizer, args.mask, device=args.gpu)
@@ -271,7 +271,7 @@ if __name__ == '__main__':
     trainer = training.Trainer(updater, (args.iteration, 'iteration'), args.out)
 
     val_interval = (10 if args.test else 1000), 'iteration'
-    log_interval = (1 if args.test else 10), 'iteration'
+    log_interval = (1 if args.test else 20), 'iteration'
 
     trainer.extend(Validator(val_iter, model, args.mask, device=args.gpu),
                    trigger=val_interval)

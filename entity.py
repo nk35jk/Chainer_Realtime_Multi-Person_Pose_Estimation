@@ -61,13 +61,15 @@ params = {
         'resnetfpn': ResNetFPN,
     },
     # training params
-    'paf_sigma': 8,
-    'heatmap_sigma': 7,
-    'max_rotate_degree': 40,
-    'crop_iob_thresh': 0.4,
-    'crop_size': 480,
     'insize': 368,
     'downscale': 8,
+    'paf_sigma': 8,
+    'heatmap_sigma': 7,
+    'target_dist': 0.6,
+    'scale_min': 0.5,
+    'scale_max': 1.1,
+    'max_rotate_degree': 40,
+    'center_perterb_max': 40,
     'mask_loss_ratio': 0.005,
 
     # inference params
@@ -166,7 +168,7 @@ def parse_args():
                         help='Number of validation samples')
     parser.add_argument('--eval_samples', type=int, default=40,
                         help='Number of validation samples')
-    parser.add_argument('--iteration', '-i', type=int, default=30000,
+    parser.add_argument('--iteration', '-i', type=int, default=600000,
                         help='Number of iterations to train')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
