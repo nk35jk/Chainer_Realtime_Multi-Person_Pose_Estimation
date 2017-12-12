@@ -402,7 +402,7 @@ if __name__ == '__main__':
     data_loader = CocoDataLoader(coco, mode=mode)
 
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
-    count = 0
+    
     for i in range(len(data_loader)):
         orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=random.randint(0, len(data_loader)))
         if annotations is not None:
