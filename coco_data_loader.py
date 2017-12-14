@@ -73,10 +73,15 @@ class CocoDataLoader(DatasetMixin):
         h, w, _ = img.shape
         joint_bboxes = self.get_joint_bboxes(joints)
         bbox_sizes = ((joint_bboxes[:, 2:] - joint_bboxes[:, :2] + 1)**2).sum(axis=1)**0.5
+        print(len(bbox_sizes))
 
-        min_scale = min((params['target_dist']*params['insize'])/bbox_sizes.min(), 1)
-        max_scale = max((params['target_dist']*params['insize'])/bbox_sizes.max(), 1)
-        # print(min_scale, max_scale)
+        min_scale = (params['target_dist']*params['insize'])/bbox_sizes.min()
+        max_scale = (params['target_dist']*params['insize'])/bbox_sizes.max()
+
+        print('min: {}, max: {}'.format(min_scale, max_scale))
+
+        min_scale = min(min_scale, 1)
+        max_scale = max(max_scale, 1)
 
         r = random.random()
         scale = float((max_scale - min_scale) * r + min_scale)

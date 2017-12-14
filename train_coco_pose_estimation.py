@@ -261,7 +261,7 @@ if __name__ == '__main__':
         val_iter = chainer.iterators.MultiprocessIterator(
             val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
         eval_iter = chainer.iterators.MultiprocessIterator(
-            eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False)
+            eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False, shared_mem=2000000)
     else:
         train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
         val_iter = chainer.iterators.SerialIterator(
@@ -302,7 +302,7 @@ if __name__ == '__main__':
     trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
-        'main/heat', 'val/heat', 'main/mask', 'val/mask',
+        'main/heat', 'val/heat', 'main/mask', 'val/mask', 'AP', 'AR'
     ]), trigger=log_interval)
     trainer.extend(extensions.ProgressBar(update_interval=1))
 

@@ -74,8 +74,8 @@ params = {
 
     # inference params
     'inference_img_size': 368,
-    'inference_scales': [0.5, 1, 1.5, 2],
-    # 'inference_scales': [1.0],
+    # 'inference_scales': [0.5, 1, 1.5, 2],
+    'inference_scales': [1.0],
     'heatmap_size': 320,
     'gaussian_sigma': 2.5,
     'ksize': 17,
