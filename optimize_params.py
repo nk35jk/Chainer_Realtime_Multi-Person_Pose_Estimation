@@ -121,5 +121,5 @@ if __name__ == '__main__':
 
     best_ap = -trials.best_trial['result']['loss']
 
-    with open(os.path.join(args.out, 'params_ap_{:.1f}.json'.format(best_ap*100)), 'w') as f:
+    with open(os.path.join(args.out, 'params_{}_ap_{:.1f}.json'.format(args.arch, best_ap*100)), 'w') as f:
         json.dump(best, f)
