@@ -90,18 +90,18 @@ class CocoDataLoader(DatasetMixin):
         min_scale = params['min_box_size']/bbox_sizes.min()
         max_scale = params['max_box_size']/bbox_sizes.max()
 
-        print(len(bbox_sizes))
-        print('min: {}, max: {}'.format(min_scale, max_scale))
+        # print(len(bbox_sizes))
+        # print('min: {}, max: {}'.format(min_scale, max_scale))
 
         min_scale = min(max(min_scale, params['min_scale']), 1)
         max_scale = min(max(max_scale, 1), params['max_scale'])
 
-        print('min: {}, max: {}'.format(min_scale, max_scale))
+        # print('min: {}, max: {}'.format(min_scale, max_scale))
 
         scale = float((max_scale - min_scale) * random.random() + min_scale)
         shape = (round(w * scale), round(h * scale))
 
-        print(scale)
+        # print(scale)
 
         resized_img, resized_mask, resized_joints, resized_stuff = self.resize_data(img, ignore_mask, joints, stuff_mask, shape)
         return resized_img, resized_mask, resized_stuff, joints

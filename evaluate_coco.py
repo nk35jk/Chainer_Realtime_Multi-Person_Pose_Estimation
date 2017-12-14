@@ -19,7 +19,7 @@ chainer.config.enable_backprop = False
 chainer.config.train = False
 
 
-if __name__ == '__main__':
+def parse_args():
     parser = argparse.ArgumentParser(description='COCO evaluation')
     parser.add_argument('arch', choices=params['archs'].keys(), default='posenet', help='Model architecture')
     parser.add_argument('weights', help='weights file path')
@@ -30,7 +30,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
+    return args
 
+
+def evaluate():
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
     eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=None)
 
@@ -101,3 +104,7 @@ if __name__ == '__main__':
     cocoEval.evaluate()
     cocoEval.accumulate()
     cocoEval.summarize()
+
+if __name__ == '__main__':
+    args = parse_args()
+    evaluate()
