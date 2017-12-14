@@ -174,7 +174,7 @@ class Evaluator(extensions.Evaluator):
     def __init__(self, cocoGt, iterator, model, compute_mask, device=None):
         super(Evaluator, self).__init__(iterator, model, device=device)
         self.cocoGt = cocoGt
-        self.pose_detector = PoseDetector(model=model, device=device, compute_mask=compute_mask)
+        self.pose_detector = PoseDetector(model=model, device=device, precise=True, compute_mask=args.mask)
 
     def evaluate(self):
         val_iter = self.get_iterator('main')
