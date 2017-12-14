@@ -11,3 +11,4 @@ result.png
 *.chainermodel
 *.npz
 *.pdf
+*.dot

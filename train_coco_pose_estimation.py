@@ -260,14 +260,14 @@ if __name__ == '__main__':
             train_loader, args.batchsize, n_processes=args.loaderjob)
         val_iter = chainer.iterators.MultiprocessIterator(
             val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
-        eval_iter = chainer.iterators.MultiprocessIterator(
-            eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False, shared_mem=2000000)
+        # eval_iter = chainer.iterators.MultiprocessIterator(
+        #     eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False, shared_mem=None)
     else:
         train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
         val_iter = chainer.iterators.SerialIterator(
             val_loader, args.valbatchsize, repeat=False, shuffle=False)
-        eval_iter = chainer.iterators.SerialIterator(
-            eval_loader, 1, repeat=False, shuffle=False)
+        # eval_iter = chainer.iterators.SerialIterator(
+        #     eval_loader, 1, repeat=False, shuffle=False)
 
     # Set up an optimizer
     # optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
@@ -293,8 +293,8 @@ if __name__ == '__main__':
 
     trainer.extend(Validator(val_iter, model, args.mask, device=args.gpu),
                    trigger=val_interval)
-    trainer.extend(Evaluator(coco_val, eval_iter, model, args.mask, device=args.gpu),
-                   trigger=val_interval)
+    # trainer.extend(Evaluator(coco_val, eval_iter, model, args.mask, device=args.gpu),
+    #                trigger=val_interval)
     # trainer.extend(extensions.dump_graph('main/loss'))
     trainer.extend(extensions.snapshot(), trigger=val_interval)
     trainer.extend(extensions.snapshot_object(

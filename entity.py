@@ -65,10 +65,12 @@ params = {
     'downscale': 8,
     'paf_sigma': 8,
     'heatmap_sigma': 7,
-    'target_dist': 0.6,
-    'scale_min': 0.5,
-    'scale_max': 1.1,
-    'max_rotate_degree': 40,
+
+    'min_box_size': 64,
+    'max_box_size': 512,
+    'min_scale': 0.5,
+    'max_scale': 2.0,
+    'max_rotate_degree': 45,
     'center_perterb_max': 40,
     'mask_loss_ratio': 0.005,
 

@@ -66,36 +66,35 @@ class CocoDataLoader(DatasetMixin):
         value[stuff_mask == -1] = 0
         hsv_stuff_mask = np.vstack((hue[None], saturation[None], value[None])).transpose(1, 2, 0)
         rgb_hsv_stuff_mask = cv2.cvtColor((hsv_stuff_mask * 255).astype(np.uint8), cv2.COLOR_HSV2BGR)
-        img = cv2.addWeighted(img, 0.3, rgb_hsv_stuff_mask, 0.7, 0)
+        img = cv2.addWeighted(img, 0.4, rgb_hsv_stuff_mask, 0.6, 0)
         return img
 
     def random_resize_img(self, img, ignore_mask, stuff_mask, joints):
         h, w, _ = img.shape
         joint_bboxes = self.get_joint_bboxes(joints)
         bbox_sizes = ((joint_bboxes[:, 2:] - joint_bboxes[:, :2] + 1)**2).sum(axis=1)**0.5
-        print(len(bbox_sizes))
 
-        min_scale = (params['target_dist']*params['insize'])/bbox_sizes.min()
-        max_scale = (params['target_dist']*params['insize'])/bbox_sizes.max()
+        min_scale = params['min_box_size']/bbox_sizes.min()
+        max_scale = params['max_box_size']/bbox_sizes.max()
 
-        print('min: {}, max: {}'.format(min_scale, max_scale))
+        # print(len(bbox_sizes))
+        # print('min: {}, max: {}'.format(min_scale, max_scale))
 
-        min_scale = min(min_scale, 1)
-        max_scale = max(max_scale, 1)
+        min_scale = min(max(min_scale, params['min_scale']), 1)
+        max_scale = min(max(max_scale, 1), params['max_scale'])
 
-        r = random.random()
-        scale = float((max_scale - min_scale) * r + min_scale)
+        # print('min: {}, max: {}'.format(min_scale, max_scale))
+
+        scale = float((max_scale - min_scale) * random.random() + min_scale)
         shape = (round(w * scale), round(h * scale))
-        # print(img.shape)
-        # print(shape)
 
         resized_img, resized_mask, resized_joints, resized_stuff = self.resize_data(img, ignore_mask, joints, stuff_mask, shape)
         return resized_img, resized_mask, resized_stuff, joints
 
     def random_rotate_img(self, img, mask, stuff_mask, joints, max_rotate_degree):
         h, w, _ = img.shape
-        r = random.random()
-        degree = (r - 0.5) * 2 * max_rotate_degree
+        # degree = (random.random() - 0.5) * 2 * max_rotate_degree
+        degree = np.random.randn() / 3 * 40
         rad = degree * math.pi / 180
         center = (w / 2, h / 2)
         R = cv2.getRotationMatrix2D(center, degree, 1)
@@ -396,7 +395,7 @@ if __name__ == '__main__':
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
     for i in range(len(data_loader)):
-        orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=i)
+        orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=np.random.randint(len(data_loader)))
         if annotations is not None:
             resized_img, pafs, heatmaps, ignore_mask, stuff_mask = data_loader.generate_labels(orig_img, annotations, ignore_mask, stuff_mask)
 
@@ -412,7 +411,7 @@ if __name__ == '__main__':
             img = data_loader.overlay_pafs(img, pafs)
             img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
             img = data_loader.overlay_ignore_mask(img, ignore_mask)
-            img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
+            # img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
 
             cv2.imshow('w', np.hstack((resized_img, img)))
             k = cv2.waitKey(0)
