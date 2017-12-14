@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
     parser.add_argument('--mask', action='store_true')
+    parser.add_argument('--out', '-o', default='result', help='Output directory')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -53,7 +54,7 @@ class Objective(object):
 
         res = []
         imgIds = []
-        for i in range(1):
+        for i in range(100):
             # print(i)
             img, annotations, img_id = self.eval_loader.get_example(i)
 
@@ -105,7 +106,7 @@ if __name__ == '__main__':
         'subset_score_thresh': hp.uniform('subset_score_thresh', 0, 1),  # 0.4
     }
 
-    max_evals = 1000
+    max_evals = 400
 
     trials = Trials()
 
@@ -120,5 +121,5 @@ if __name__ == '__main__':
 
     best_ap = -trials.best_trial['result']['loss']
 
-    with open('params_ap_{:.1f}.json'.format(best_ap*100), 'w') as f:
+    with open(os.path.join(args.out, 'params_ap_{:.1f}.json'.format(best_ap*100)), 'w') as f:
         json.dump(best, f)

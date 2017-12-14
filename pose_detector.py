@@ -441,7 +441,7 @@ class PoseDetector(object):
             print("Inference scale: %.1f..." % (scale))
 
             multiplier = scale * params['inference_img_size'] / min(orig_img.shape[:2])
-            print(multiplier)
+            # print(multiplier)
             img = cv2.resize(orig_img, (0, 0), fx=multiplier, fy=multiplier, interpolation=interpolation)
             padded_img, pad = self.pad_image(img, params['downscale'], 128)
 
