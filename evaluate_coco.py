@@ -49,17 +49,17 @@ if __name__ == '__main__':
         imgIds.append(img_id)
 
         st = time.time()
-        person_pose_array = pose_detector(img)
+        poses = pose_detector(img)
         print('inference: {:.2f}s'.format(time.time() - st))
 
-        for person_pose in person_pose_array:
+        for pose in poses:
             res_dict = {}
             res_dict['category_id'] = 1
             res_dict['image_id'] = img_id
             res_dict['score'] = 1
 
             keypoints = np.zeros((len(params['coco_joint_indices']), 3))
-            for joint, jt in zip(person_pose, JointType):
+            for joint, jt in zip(pose, JointType):
                 if joint is not None and jt in params['coco_joint_indices']:
                     j = params['coco_joint_indices'].index(jt)
                     keypoints[j] = joint
@@ -67,7 +67,7 @@ if __name__ == '__main__':
             res.append(res_dict)
 
         if args.vis:
-            img = draw_person_pose(img, person_pose_array)
+            img = draw_person_pose(img, poses)
 
             for ann in annotations:
                 for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):

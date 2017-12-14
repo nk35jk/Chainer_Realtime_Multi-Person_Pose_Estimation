@@ -166,7 +166,7 @@ def parse_args():
                         help='Validation minibatch size')
     parser.add_argument('--val_samples', type=int, default=100,
                         help='Number of validation samples')
-    parser.add_argument('--eval_samples', type=int, default=40,
+    parser.add_argument('--eval_samples', type=int, default=100,
                         help='Number of validation samples')
     parser.add_argument('--iteration', '-i', type=int, default=600000,
                         help='Number of iterations to train')

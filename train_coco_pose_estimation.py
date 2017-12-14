@@ -171,10 +171,10 @@ class Validator(extensions.Evaluator):
 
 class Evaluator(extensions.Evaluator):
 
-    def __init__(self, cocoGt, iterator, model, device=None):
+    def __init__(self, cocoGt, iterator, model, compute_mask, device=None):
         super(Evaluator, self).__init__(iterator, model, device=device)
         self.cocoGt = cocoGt
-        self.pose_detector = PoseDetector(model=model, device=device)
+        self.pose_detector = PoseDetector(model=model, device=device, compute_mask=compute_mask)
 
     def evaluate(self):
         val_iter = self.get_iterator('main')
@@ -189,23 +189,23 @@ class Evaluator(extensions.Evaluator):
             img, annotation, img_id = batch[0]
             with function.no_backprop_mode():
                 imgIds.append(img_id)
-                person_pose_array = self.pose_detector(img)
+                poses = self.pose_detector(img)
 
-                for person_pose in person_pose_array:
+                for pose in poses:
                     res_dict = {}
                     res_dict['category_id'] = 1
                     res_dict['image_id'] = img_id
                     res_dict['score'] = 1
 
                     keypoints = np.zeros((len(params['coco_joint_indices']), 3))
-                    for joint, jt in zip(person_pose, JointType):
+                    for joint, jt in zip(pose, JointType):
                         if joint is not None and jt in params['coco_joint_indices']:
                             i = params['coco_joint_indices'].index(jt)
                             keypoints[i] = joint
                     res_dict['keypoints'] = keypoints.ravel()
                     res.append(res_dict)
 
-            img = draw_person_pose(img, person_pose_array)
+            img = draw_person_pose(img, poses)
 
             # import matplotlib.pyplot as plt
             # plt.imshow(img[..., ::-1]); plt.show()
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
     train_loader = CocoDataLoader(coco_train, mode='train')
     val_loader = CocoDataLoader(coco_val, mode='val', n_samples=args.val_samples)
-    # eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=args.eval_samples)
+    eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=args.eval_samples)
 
     if args.loaderjob:
         multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug
@@ -260,14 +260,14 @@ if __name__ == '__main__':
             train_loader, args.batchsize, n_processes=args.loaderjob)
         val_iter = chainer.iterators.MultiprocessIterator(
             val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
-        # eval_iter = chainer.iterators.MultiprocessIterator(
-        #     eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False)
+        eval_iter = chainer.iterators.MultiprocessIterator(
+            eval_loader, n_processes=args.loaderjob, repeat=False, shuffle=False)
     else:
         train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
         val_iter = chainer.iterators.SerialIterator(
             val_loader, args.valbatchsize, repeat=False, shuffle=False)
-        # eval_iter = chainer.iterators.SerialIterator(
-        #     eval_loader, 1, repeat=False, shuffle=False)
+        eval_iter = chainer.iterators.SerialIterator(
+            eval_loader, repeat=False, shuffle=False)
 
     # Set up an optimizer
     # optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
@@ -286,7 +286,6 @@ if __name__ == '__main__':
 
     # Set up a trainer
     updater = Updater(train_iter, model, optimizer, args.mask, device=args.gpu)
-    # updater = Updater2(train_iter, model, optimizer, args.mask, devices={'main': 0, 'second': 1})
     trainer = training.Trainer(updater, (args.iteration, 'iteration'), args.out)
 
     val_interval = (10 if args.test else 1000), 'iteration'
@@ -294,8 +293,8 @@ if __name__ == '__main__':
 
     trainer.extend(Validator(val_iter, model, args.mask, device=args.gpu),
                    trigger=val_interval)
-    # trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
-    #                trigger=val_interval)
+    trainer.extend(Evaluator(coco_val, eval_iter, model, args.mask, device=args.gpu),
+                   trigger=val_interval)
     # trainer.extend(extensions.dump_graph('main/loss'))
     trainer.extend(extensions.snapshot(), trigger=val_interval)
     trainer.extend(extensions.snapshot_object(
