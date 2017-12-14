@@ -69,6 +69,19 @@ class CocoDataLoader(DatasetMixin):
         img = cv2.addWeighted(img, 0.4, rgb_hsv_stuff_mask, 0.6, 0)
         return img
 
+    def get_joint_bboxes(self, joints):
+        joint_bboxes = []
+        for person_joints in joints:
+            x1 = person_joints[person_joints[:, 2] > 0][:, 0].min()
+            y1 = person_joints[person_joints[:, 2] > 0][:, 1].min()
+            x2 = person_joints[person_joints[:, 2] > 0][:, 0].max()
+            y2 = person_joints[person_joints[:, 2] > 0][:, 1].max()
+            joint_bboxes.append([x1, y1, x2, y2])
+        joint_bboxes = np.array(joint_bboxes)
+        # for x1, y1, x2, y2 in joint_bboxes:  # draw joint bboxes
+        #     cv2.rectangle(orig_img, (x1, y1), (x2, y2), (0, 255, 0), 1)
+        return joint_bboxes
+
     def random_resize_img(self, img, ignore_mask, stuff_mask, joints):
         h, w, _ = img.shape
         joint_bboxes = self.get_joint_bboxes(joints)
@@ -77,24 +90,26 @@ class CocoDataLoader(DatasetMixin):
         min_scale = params['min_box_size']/bbox_sizes.min()
         max_scale = params['max_box_size']/bbox_sizes.max()
 
-        # print(len(bbox_sizes))
-        # print('min: {}, max: {}'.format(min_scale, max_scale))
+        print(len(bbox_sizes))
+        print('min: {}, max: {}'.format(min_scale, max_scale))
 
         min_scale = min(max(min_scale, params['min_scale']), 1)
         max_scale = min(max(max_scale, 1), params['max_scale'])
 
-        # print('min: {}, max: {}'.format(min_scale, max_scale))
+        print('min: {}, max: {}'.format(min_scale, max_scale))
 
         scale = float((max_scale - min_scale) * random.random() + min_scale)
         shape = (round(w * scale), round(h * scale))
 
+        print(scale)
+
         resized_img, resized_mask, resized_joints, resized_stuff = self.resize_data(img, ignore_mask, joints, stuff_mask, shape)
         return resized_img, resized_mask, resized_stuff, joints
 
-    def random_rotate_img(self, img, mask, stuff_mask, joints, max_rotate_degree):
+    def random_rotate_img(self, img, mask, stuff_mask, joints):
         h, w, _ = img.shape
-        # degree = (random.random() - 0.5) * 2 * max_rotate_degree
-        degree = np.random.randn() / 3 * 40
+        # degree = (random.random() - 0.5) * 2 * params['max_rotate_degree']
+        degree = np.random.randn() / 3 * params['max_rotate_degree']
         rad = degree * math.pi / 180
         center = (w / 2, h / 2)
         R = cv2.getRotationMatrix2D(center, degree, 1)
@@ -195,26 +210,13 @@ class CocoDataLoader(DatasetMixin):
         stuff_mask = cv2.resize(stuff_mask, shape, interpolation=cv2.INTER_NEAREST)
         return resized_img, ignore_mask, joints, stuff_mask
 
-    def get_joint_bboxes(self, joints):
-        joint_bboxes = []
-        for person_joints in joints:
-            x1 = person_joints[person_joints[:, 2] > 0][:, 0].min()
-            y1 = person_joints[person_joints[:, 2] > 0][:, 1].min()
-            x2 = person_joints[person_joints[:, 2] > 0][:, 0].max()
-            y2 = person_joints[person_joints[:, 2] > 0][:, 1].max()
-            joint_bboxes.append([x1, y1, x2, y2])
-        joint_bboxes = np.array(joint_bboxes)
-        # for x1, y1, x2, y2 in joint_bboxes:  # draw joint bboxes
-        #     cv2.rectangle(orig_img, (x1, y1), (x2, y2), (0, 255, 0), 1)
-        return joint_bboxes
-
     def augment_data(self, orig_img, ignore_mask, joints, stuff_mask):
         # TODO: need visialisation for debug
         aug_img = orig_img.copy()
         aug_img, ignore_mask, stuff_mask, joints = self.random_resize_img(
             aug_img, ignore_mask, stuff_mask, joints)
         aug_img, ignore_mask, stuff_mask, joints = self.random_rotate_img(
-            aug_img, ignore_mask, stuff_mask, joints, params['max_rotate_degree'])
+            aug_img, ignore_mask, stuff_mask, joints)
         aug_img, ignore_mask, stuff_mask, joints = self.random_crop_img(
             aug_img, ignore_mask, stuff_mask, joints)
 

@@ -70,7 +70,7 @@ params = {
     'max_box_size': 512,
     'min_scale': 0.5,
     'max_scale': 2.0,
-    'max_rotate_degree': 45,
+    'max_rotate_degree': 40,
     'center_perterb_max': 40,
     'mask_loss_ratio': 0.005,
 
