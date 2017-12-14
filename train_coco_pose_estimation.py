@@ -261,13 +261,13 @@ if __name__ == '__main__':
         val_iter = chainer.iterators.MultiprocessIterator(
             val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
         eval_iter = chainer.iterators.MultiprocessIterator(
-            eval_loader, n_processes=args.loaderjob, repeat=False, shuffle=False)
+            eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False)
     else:
         train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
         val_iter = chainer.iterators.SerialIterator(
             val_loader, args.valbatchsize, repeat=False, shuffle=False)
         eval_iter = chainer.iterators.SerialIterator(
-            eval_loader, repeat=False, shuffle=False)
+            eval_loader, 1, repeat=False, shuffle=False)
 
     # Set up an optimizer
     # optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
