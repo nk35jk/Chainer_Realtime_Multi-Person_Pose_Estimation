@@ -7,8 +7,8 @@ from chainer.links import caffe
 def copy_vgg_params(model):
     print('Copying params of pretrained model...')
     layer_names = [
-        "conv1_1", "conv1_2", "conv2_1", "conv2_2", "conv3_1",
-        "conv3_2", "conv3_3", "conv3_4", "conv4_1", "conv4_2",
+        'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+        'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
     ]
     pre_model = caffe.CaffeFunction('models/VGG_ILSVRC_19_layers.caffemodel')
     for layer_name in layer_names:
@@ -39,6 +39,7 @@ class PoseNet(chainer.Chain):
             self.conv4_3_CPM = L.Convolution2D(512, 256, 3, stride=1, pad=1)
             self.conv4_4_CPM = L.Convolution2D(256, 128, 3, stride=1, pad=1)
 
+            # stage1
             self.conv5_1_CPM_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
             self.conv5_2_CPM_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
             self.conv5_3_CPM_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
