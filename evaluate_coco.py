@@ -34,7 +34,7 @@ if __name__ == '__main__':
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
     eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=None)
 
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, args.mask)
 
     # cv2.namedWindow('results', cv2.WINDOW_NORMAL)
 
