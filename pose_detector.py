@@ -16,6 +16,7 @@ class PoseDetector(object):
     def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False, compute_mask=False):
         self.arch = arch
         self.precise = precise
+        self.compute_mask = compute_mask
         if model is not None:
             self.model = model
         else:
@@ -448,7 +449,10 @@ class PoseDetector(object):
             if self.device >= 0:
                 x_data = cuda.to_gpu(x_data)
 
-            h1s, h2s = self.model(x_data)
+            if self.compute_mask:
+                h1s, h2s, _ = self.model(x_data)
+            else:
+                h1s, h2s = self.model(x_data)
 
             tmp_paf = h1s[-1][0].data.transpose(1, 2, 0)
             tmp_heatmap = h2s[-1][0].data.transpose(1, 2, 0)
@@ -505,7 +509,10 @@ class PoseDetector(object):
             if self.device >= 0:
                 x_data = cuda.to_gpu(x_data)
 
-            h1s, h2s = self.model(x_data)
+            if self.compute_mask:
+                h1s, h2s, _ = self.model(x_data)
+            else:
+                h1s, h2s = self.model(x_data)
 
             pafs_sum += F.resize_images(h1s[-1], (resized_output_img_h, resized_output_img_w)).data[0]
             heatmaps_sum += F.resize_images(h2s[-1], (resized_output_img_h, resized_output_img_w)).data[0]

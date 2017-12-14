@@ -235,17 +235,10 @@ if __name__ == '__main__':
 
     if args.arch == 'posenet':
         posenet.copy_vgg_params(model)
-        # layer_names = [
-        #     'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
-        #     'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
-        # ]
-        # for layer_name in layer_names:
-        #     model[layer_name].disable_update()
     elif args.arch == 'nn1':
         nn1.copy_squeezenet_params(model.squeeze)
     elif args.arch == 'resnetfpn':
         chainer.serializers.load_npz('models/resnet50.npz', model.res)
-        # model.res.disable_update()
 
     if args.initmodel:
         print('Load model from', args.initmodel)
