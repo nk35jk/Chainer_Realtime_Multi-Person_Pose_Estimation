@@ -104,6 +104,8 @@ class Updater(StandardUpdater):
                     optimizer.target[layer_name].enable_update()
             elif args.arch == 'resnetfpn':
                 optimizer.target.res.enable_update()
+            elif args.arch == 'nn1':
+                model.squeeze.enable_update()
 
         batch = train_iter.next()
 
@@ -294,6 +296,8 @@ if __name__ == '__main__':
                 model[layer_name].disable_update()
         elif args.arch == 'resnetfpn':
             model.res.disable_update()
+        elif args.arch == 'nn1':
+            model.squeeze.disable_update()
 
     # Set up a trainer
     updater = Updater(train_iter, model, optimizer, args.mask, device=args.gpu)

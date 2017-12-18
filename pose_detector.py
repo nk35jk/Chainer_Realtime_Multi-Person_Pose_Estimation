@@ -99,7 +99,7 @@ class PoseDetector(object):
                 peaks_with_score_and_id = [peaks_with_score[i] + (peaks_id[i], ) for i in range(len(peaks_id))] # [(x, y, score, id), (x, y, score, id)...]のpeak配列
                 peak_counter += len(peaks_with_score_and_id)
                 all_peaks.append(peaks_with_score_and_id)
-            all_peaks = np.array([peak for peaks_each_category in all_peaks for peak in peaks_each_category])
+            all_peaks = xp.array([peak for peaks_each_category in all_peaks for peak in peaks_each_category])
         else:
             heatmaps = F.convolution_2d(heatmaps[:, None], self.gaussian_kernel, stride=1, pad=int(params['ksize']/2)).data.squeeze()
             left_heatmaps = xp.zeros(heatmaps.shape)
@@ -123,43 +123,67 @@ class PoseDetector(object):
             all_peaks = all_peaks.get()
         return all_peaks
 
-    def extract_paf_in_points(self, paf, points):
-        paf_in_edge = []
-
-        for point in points:
-            point_x = int(round(point[0]))
-            point_y = int(round(point[1]))
-            paf_in_edge.append([paf[0, point_y, point_x], paf[1, point_y, point_x]])
-
-        return paf_in_edge
-
     def compute_candidate_connections(self, paf, cand_a, cand_b, img_len, params):
-        candidate_connections = []
 
-        for joint_a in cand_a:
-            for joint_b in cand_b:  # jointは(x, y)座標
-                vector = joint_b[:2] - joint_a[:2]
-                norm = np.linalg.norm(vector)
-                if norm == 0:
-                    continue
+        xp = cuda.get_array_module(paf)
 
-                unit_vector = vector / norm
-                integ_points = zip(
-                    np.linspace(joint_a[0], joint_b[0], num=params['n_integ_points']),
-                    np.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
-                )  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
+        if xp == np:
+            candidate_connections = []
+            for joint_a in cand_a:
+                for joint_b in cand_b:  # jointは(x, y)座標
+                    vector = joint_b[:2] - joint_a[:2]
+                    norm = xp.linalg.norm(vector)
+                    if norm == 0:
+                        continue
 
-                paf_in_edge = self.extract_paf_in_points(paf, integ_points)
-                inner_products = np.dot(paf_in_edge, unit_vector)
+                    ys = xp.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
+                    xs = xp.linspace(joint_a[0], joint_b[0], num=params['n_integ_points'])
+                    integ_points = xp.stack([ys, xs]).T.round().astype('i')  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
+                    paf_in_edge = xp.hstack([paf[0][xp.hsplit(integ_points, 2)], paf[1][xp.hsplit(integ_points, 2)]])
+                    unit_vector = vector / norm
+                    inner_products = xp.dot(paf_in_edge, unit_vector)
 
-                integ_value = np.sum(inner_products) / len(inner_products)
-                integ_value_with_dist_prior = integ_value + min(params['limb_length_ratio'] * img_len / norm - params['length_penalty_value'], 0)  # vectorの長さが基準値以上の時にペナルティを与える
+                    integ_value = inner_products.sum() / len(inner_products)
+                    # vectorの長さが基準値以上の時にペナルティを与える
+                    integ_value_with_dist_prior = integ_value + min(params['limb_length_ratio'] * img_len / norm - params['length_penalty_value'], 0)
 
-                n_valid_points = len(np.nonzero(inner_products > params['inner_product_thresh'])[0])
-                if n_valid_points > params['n_integ_points_thresh'] and integ_value_with_dist_prior > 0:
-                    candidate_connections.append([int(joint_a[3]), int(joint_b[3]), integ_value_with_dist_prior])
+                    n_valid_points = sum(inner_products > params['inner_product_thresh'])
+                    if n_valid_points > params['n_integ_points_thresh'] and integ_value_with_dist_prior > 0:
+                        candidate_connections.append([int(joint_a[3]), int(joint_b[3]), integ_value_with_dist_prior])
+            candidate_connections_ = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
+        else:
+            grid_a = xp.tile(cand_a.T[:, :, None], len(cand_b))
+            grid_b = xp.tile(cand_b.T[:, :, None], len(cand_a)).transpose(0, 2, 1)
 
-        candidate_connections = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
+            grid_vector = grid_b[:2] - grid_a[:2]
+            grid_norm = (grid_vector**2).sum(axis=0)**0.5
+
+            ratio = xp.linspace(0, 1, params['n_integ_points'])
+            st_y = xp.tile(grid_a[1][:, :, None], params['n_integ_points'])
+            st_x = xp.tile(grid_a[0][:, :, None], params['n_integ_points'])
+            vec_y = xp.tile(grid_vector[1, :, :, None], params['n_integ_points'])
+            vec_x = xp.tile(grid_vector[0, :, :, None], params['n_integ_points'])
+            grid_ys = (st_y + vec_y * ratio + 0.5).astype('i')
+            grid_xs = (st_x + vec_x * ratio + 0.5).astype('i')
+
+            grid_paf_in_edge = paf[:, grid_ys, grid_xs]
+            grid_unit_vector = grid_vector / grid_norm
+            grid_unit_vector = xp.tile(grid_unit_vector[..., None], params['n_integ_points'])
+            grid_inner_products = grid_paf_in_edge[0] * grid_unit_vector[0] + grid_paf_in_edge[1] * grid_unit_vector[1]
+
+            grid_dist_prior = params['limb_length_ratio'] * img_len / grid_norm - params['length_penalty_value']
+            grid_dist_prior[grid_dist_prior > 0] = 0
+
+            grid_integ_value = grid_inner_products.sum(axis=2) / grid_inner_products.shape[2]
+            grid_integ_value_with_dist_prior = grid_integ_value + grid_dist_prior
+
+            grid_n_valid_points = (grid_inner_products > params['inner_product_thresh']).sum(axis=2)
+
+            i, j = xp.where((grid_n_valid_points > params['n_integ_points_thresh']) & (grid_integ_value_with_dist_prior > 0))
+            candidate_connections = xp.vstack((grid_a[3, i, j], grid_b[3, i, j], grid_integ_value_with_dist_prior[i, j])).T
+            candidate_connections = candidate_connections[candidate_connections[:, 2].argsort()[::-1]]  # sort
+            candidate_connections = candidate_connections.get()
+
         return candidate_connections
 
     def compute_connections(self, pafs, all_peaks, img_len, params):
@@ -450,7 +474,7 @@ class PoseDetector(object):
         interpolation = cv2.INTER_CUBIC
 
         for scale in params['inference_scales']:
-            print('Inference scale: {:.1f}...'.format(scale))
+            # print('Inference scale: {:.1f}...'.format(scale))
 
             multiplier = scale * params['inference_img_size'] / min(orig_img.shape[:2])
             img = cv2.resize(orig_img, (0, 0), fx=multiplier, fy=multiplier, interpolation=interpolation)
@@ -490,6 +514,8 @@ class PoseDetector(object):
         # heatmaps = (heatmaps_sum / len(params['inference_scales']))
 
         # if self.device >= 0:
+        #     pafs = cuda.to_gpu(pafs)
+        #     heatmaps = cuda.to_gpu(heatmaps)
         #     cuda.get_device_from_id(self.device).synchronize()
         # print('forward: {:.2f}s'.format(time.time() - st))
 
@@ -574,7 +600,7 @@ def draw_person_pose(orig_img, poses):
     # limbs
     for pose in poses.round().astype('i'):
         for i, (limb, color) in enumerate(zip(params['limbs_point'], limb_colors)):
-            # if i != 9 and i != 13:  # don't show ear-shoulder connection
+            if i != 9 and i != 13:  # don't show ear-shoulder connection
                 limb_ind = np.array(limb)
                 if np.all(pose[limb_ind][:, 2] != 0):
                     joint1, joint2 = pose[limb_ind][:, :2]
