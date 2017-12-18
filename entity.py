@@ -76,18 +76,19 @@ params = {
 
     # inference params
     'inference_img_size': 368,
-    'inference_scales': [0.5, 1, 1.5, 2],
-    # 'inference_scales': [1.0],
+    # 'inference_scales': [0.5, 1, 1.5, 2],
+    'inference_scales': [1.0],
     'heatmap_size': 320,
     'gaussian_sigma': 2.5,
     'ksize': 17,
-    'n_integ_points': 10,       # 1つのconnectionを10等分して積分計算
-    'n_integ_points_thresh': 8, # 1つのconnectionで最低8点以上が閾値を超えた場合に有効
-    'heatmap_peak_thresh': 0.1,
-    'inner_product_thresh': 0.05,
-    'length_penalty_ratio': 0.5,
-    'n_subset_limbs_thresh': 7,
-    'subset_score_thresh': 0.4,
+    'n_integ_points': 10,  # 10, 13
+    'n_integ_points_thresh': 8,  # 8, 5
+    'heatmap_peak_thresh': 0.1,  # 0.1, 0.038
+    'inner_product_thresh': 0.05,  # 005, 0.0037
+    'limb_length_ratio': 0.5,  # 0.5, 0.87
+    'length_penalty_value': 1,
+    'n_subset_limbs_thresh': 6,  # 7, 6
+    'subset_score_thresh': 0.4,  # 0.4, 0.55
     'limbs_point': [
         [JointType.Neck, JointType.RightWaist],
         [JointType.RightWaist, JointType.RightKnee],

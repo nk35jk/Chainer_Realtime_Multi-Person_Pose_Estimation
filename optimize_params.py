@@ -44,25 +44,19 @@ class Objective(object):
         self.pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask)
 
     def __call__(self, p):
-        params['n_integ_points'] = p['n_integ_points']
-        params['n_integ_points_thresh'] = p['n_integ_points_thresh']
-        params['heatmap_peak_thresh'] = p['heatmap_peak_thresh']
-        params['inner_product_thresh'] = p['inner_product_thresh']
-        params['length_penalty_ratio'] = p['length_penalty_ratio']
-        params['n_subset_limbs_thresh'] = p['n_subset_limbs_thresh']
-        params['subset_score_thresh'] = p['subset_score_thresh']
+        for key in p.keys():
+            params[key] = p[key]
 
         res = []
         imgIds = []
         for i in range(100):
-            # print(i)
             img, annotations, img_id = self.eval_loader.get_example(i)
 
             imgIds.append(img_id)
 
             st = time.time()
             poses = self.pose_detector(img)
-            # print('inference: {:.2f}s'.format(time.time() - st))
+            print('inference: {:.2f}s'.format(time.time() - st))
 
             for pose in poses:
                 res_dict = {}
@@ -86,6 +80,18 @@ class Objective(object):
             cocoEval.accumulate()
             cocoEval.summarize()
             ap = cocoEval.stats[0]
+
+            path = os.path.join(args.out, 'optimize_log_{}.csv'.format(args.arch))
+            with open(path, 'a') as f:
+                f.write('{}, {}, {}, {}, {}, {}, {}\n'.format(
+                    ap,
+                    p['n_integ_points'],
+                    p['n_integ_points_thresh'],
+                    p['heatmap_peak_thresh'],
+                    p['inner_product_thresh'],
+                    p['limb_length_ratio'],
+                    p['subset_score_thresh'],
+                ))
         except:
             ap = 0
         return -ap
@@ -97,16 +103,16 @@ if __name__ == '__main__':
     objective = Objective()
 
     space = {
-        'n_integ_points': hp.quniform('n_integ_points', 10, 14, 1),  # 10
-        'n_integ_points_thresh': hp.quniform('n_integ_points_thresh', 4, 8, 1),  # 8
-        'heatmap_peak_thresh': hp.uniform('heatmap_peak_thresh', 0, 0.8),  # 0.1
-        'inner_product_thresh': hp.uniform('inner_product_thresh', 0, 0.2),  # 0.05
-        'length_penalty_ratio': hp.uniform('length_penalty_ratio', 0, 1),  # 0.5
-        'n_subset_limbs_thresh': hp.quniform('n_subset_limbs_thresh', 1, 14, 1),  # 7
-        'subset_score_thresh': hp.uniform('subset_score_thresh', 0, 1),  # 0.4
+        'n_integ_points': hp.quniform('n_integ_points', 10, 15, 1),  # 10
+        'n_integ_points_thresh': hp.quniform('n_integ_points_thresh', 3, 8, 1),  # 8
+        'heatmap_peak_thresh': hp.uniform('heatmap_peak_thresh', 0.005, 0.3),  # 0.1
+        'inner_product_thresh': hp.uniform('inner_product_thresh', 0.001, 0.1),  # 0.05
+        'limb_length_ratio': hp.uniform('limb_length_ratio', 0.1, 1.5),  # 0.5
+        'n_subset_limbs_thresh': hp.quniform('n_subset_limbs_thresh', 3, 10, 1),  # 7
+        'subset_score_thresh': hp.uniform('subset_score_thresh', 0.05, 1),  # 0.4
     }
 
-    max_evals = 400
+    max_evals = 1000
 
     trials = Trials()
 
@@ -121,5 +127,6 @@ if __name__ == '__main__':
 
     best_ap = -trials.best_trial['result']['loss']
 
-    with open(os.path.join(args.out, 'params_{}_ap_{:.1f}.json'.format(args.arch, best_ap*100)), 'w') as f:
+    path = os.path.join(args.out, 'params_{}_ap_{:.1f}.json'.format(args.arch, best_ap*100))
+    with open(path, 'w') as f:
         json.dump(best, f)

@@ -111,10 +111,10 @@ class PoseDetector(object):
             top_heatmaps[:, :, 1:] = heatmaps[:, :, :-1]
             bottom_heatmaps[:, :, :-1] = heatmaps[:, :, 1:]
 
-            peaks_binary = xp.logical_and(heatmaps >= left_heatmaps, heatmaps >= right_heatmaps)
+            peaks_binary = xp.logical_and(heatmaps >= params['heatmap_peak_thresh'], heatmaps >= right_heatmaps)
             peaks_binary = xp.logical_and(peaks_binary, heatmaps >= top_heatmaps)
+            peaks_binary = xp.logical_and(peaks_binary, heatmaps >= left_heatmaps)
             peaks_binary = xp.logical_and(peaks_binary, heatmaps >= bottom_heatmaps)
-            peaks_binary = xp.logical_and(peaks_binary, heatmaps >= params['heatmap_peak_thresh'])
 
             peak_c, peak_y, peak_x = xp.nonzero(peaks_binary)
             peak_score = heatmaps[peak_c, peak_y, peak_x]
@@ -133,31 +133,31 @@ class PoseDetector(object):
 
         return paf_in_edge
 
-    def compute_candidate_connections_greedy(self, paf, cand_a, cand_b, img_len, params):
+    def compute_candidate_connections(self, paf, cand_a, cand_b, img_len, params):
         candidate_connections = []
 
-        for index_a, joint_a in enumerate(cand_a):
-            for index_b, joint_b in enumerate(cand_b): # jointは(x, y)座標
-                vec = np.subtract(joint_b[:2], joint_a[:2])
-                vec_len = np.linalg.norm(vec)
-                if vec_len == 0:
+        for joint_a in cand_a:
+            for joint_b in cand_b:  # jointは(x, y)座標
+                vector = joint_b[:2] - joint_a[:2]
+                norm = np.linalg.norm(vector)
+                if norm == 0:
                     continue
 
-                vec_unit = vec / vec_len
+                unit_vector = vector / norm
                 integ_points = zip(
                     np.linspace(joint_a[0], joint_b[0], num=params['n_integ_points']),
                     np.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
-                ) # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
+                )  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
 
                 paf_in_edge = self.extract_paf_in_points(paf, integ_points)
-                inner_products = np.dot(paf_in_edge, vec_unit)
+                inner_products = np.dot(paf_in_edge, unit_vector)
 
                 integ_value = np.sum(inner_products) / len(inner_products)
-                integ_value_with_dist_prior = integ_value + min(params['length_penalty_ratio'] * img_len / vec_len - 1, 0) # vectorの長さが1以上の時にペナルティを与える(0 ~ 0.75、長いほどペナルティが大きい)
+                integ_value_with_dist_prior = integ_value + min(params['limb_length_ratio'] * img_len / norm - params['length_penalty_value'], 0)  # vectorの長さが基準値以上の時にペナルティを与える
 
                 n_valid_points = len(np.nonzero(inner_products > params['inner_product_thresh'])[0])
                 if n_valid_points > params['n_integ_points_thresh'] and integ_value_with_dist_prior > 0:
-                    candidate_connections.append([index_a, index_b, integ_value_with_dist_prior, integ_value_with_dist_prior + joint_a[2] + joint_b[2]])
+                    candidate_connections.append([int(joint_a[3]), int(joint_b[3]), integ_value_with_dist_prior])
 
         candidate_connections = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
         return candidate_connections
@@ -172,71 +172,83 @@ class PoseDetector(object):
             cand_b = all_peaks[all_peaks[:, 0] == limb_point[1]][:, 1:]
 
             if len(cand_a) > 0 and len(cand_b) > 0:
-                candidate_connections = self.compute_candidate_connections_greedy(paf, cand_a, cand_b, img_len, params)
-                connections = np.zeros((0, 5))
-                for c in candidate_connections:
-                    index_a, index_b, score = c[0:3]
-                    if index_a not in connections[:, 3] and index_b not in connections[:, 4]:
-                        connections = np.vstack([connections, [cand_a[index_a][3], cand_b[index_b][3], score, index_a, index_b]])
+                candidate_connections = self.compute_candidate_connections(paf, cand_a, cand_b, img_len, params)
+                connections = np.zeros((0, 3))
+                for index_a, index_b, score in candidate_connections:
+                    if index_a not in connections[:, 0] and index_b not in connections[:, 1]:
+                        connections = np.vstack([connections, [index_a, index_b, score]])
                         if len(connections) >= min(len(cand_a), len(cand_b)):
                             break
-
                 all_connections.append(connections)
             else:
-                all_connections.append(np.zeros((0, 5)))
+                all_connections.append(np.zeros((0, 3)))
         return all_connections
 
     def grouping_key_points(self, all_connections, candidate_peaks, params):
         subsets = -1 * np.ones((0, 20))
 
-        for connection_category_index in range(len(params['limbs_point'])):
-            paf_index = [connection_category_index * 2, connection_category_index * 2 + 1]
-            joint_a_indices = all_connections[connection_category_index][:, 0]
-            joint_b_indices = all_connections[connection_category_index][:, 1]
-            joint_category_a_index, joint_category_b_index = params['limbs_point'][connection_category_index] # カテゴリのindex
+        for l, connections in enumerate(all_connections):
+            joint_a, joint_b = params['limbs_point'][l]  # カテゴリのindex
 
-            for connection_index, _ in enumerate(all_connections[connection_category_index]):
+            for ind_a, ind_b, score in connections[:, :3]:
+                ind_a, ind_b = int(ind_a), int(ind_b)
+
+                # TODO: fix
                 joint_found_cnt = 0
                 joint_found_subset_index = [-1, -1]
-                for subset_index, subset in enumerate(subsets):
+                for subset_ind, subset in enumerate(subsets):
                     # そのconnectionのjointをもってるsubsetがいる場合
-                    if subset[joint_category_a_index] == joint_a_indices[connection_index] or subset[joint_category_b_index] == joint_b_indices[connection_index]:
-                        joint_found_subset_index[joint_found_cnt] = subset_index
+                    if subset[joint_a] == ind_a or subset[joint_b] == ind_b:
+                        joint_found_subset_index[joint_found_cnt] = subset_ind
                         joint_found_cnt += 1
+                ###
 
                 if joint_found_cnt == 1: # そのconnectionのどちらかのjointをsubsetが持っている場合
                     found_subset = subsets[joint_found_subset_index[0]]
                     # 肩->耳のconnectionの組合せを除いて、始点の一致しか起こり得ない。肩->耳の場合、終点が一致していた場合は、既に顔のbone検出済みなので処理不要。
-                    if(found_subset[joint_category_b_index] != joint_b_indices[connection_index]):
-                        found_subset[joint_category_b_index] = joint_b_indices[connection_index]
+                    if found_subset[joint_b] != ind_b:
+                        found_subset[joint_b] = ind_b
                         found_subset[-1] += 1 # increment joint count
-                        # joint bのscoreとconnectionの積分値を加算
-                        found_subset[-2] += candidate_peaks[joint_b_indices[connection_index].astype(int), 3] + all_connections[connection_category_index][connection_index][2]
+                        found_subset[-2] += candidate_peaks[ind_b, 3] + score  # joint bのscoreとconnectionの積分値を加算
 
                 elif joint_found_cnt == 2: # subset1にjoint1が、subset2にjoint2がある場合(肩->耳のconnectionの組合せした起こり得ない)
+                    print('limb {}: 2 subsets have any joint'.format(l))
                     found_subset_1 = subsets[joint_found_subset_index[0]]
                     found_subset_2 = subsets[joint_found_subset_index[1]]
 
                     membership = ((found_subset_1 >= 0).astype(int) + (found_subset_2 >= 0).astype(int))[:-2]
-                    if len(np.nonzero(membership == 2)[0]) == 0: # merge two subsets when no duplication
+                    if not np.any(membership == 2):  # merge two subsets when no duplication
                         found_subset_1[:-2] += found_subset_2[:-2] + 1 # default is -1
                         found_subset_1[-2:] += found_subset_2[-2:]
-                        found_subset_1[-2:] += all_connections[connection_category_index][connection_index][2] # connectionの積分値のみ加算(jointのscoreはmerge時に全て加算済み)
-                        subsets = np.delete(subsets, joint_found_subset_index[1], 0)
+                        found_subset_1[-2:] += score  # connectionの積分値のみ加算(jointのscoreはmerge時に全て加算済み)
+                        subsets = np.delete(subsets, joint_found_subset_index[1], axis=0)
                     else:
-                        pass
-                        # found_subset_1[joint_category_b_index] = joint_b_indices[connection_index]
-                        # found_subset_1[-1] += 1 # increment joint count
-                        # found_subset_1[-2] += candidate_peaks[joint_b_indices[connection_index].astype(int), 3] + all_connections[connection_category_index][connection_index][2]
-                        # joint bのscoreとconnectionの積分値を加算
+                        if found_subset_1[joint_a] == -1:
+                            found_subset_1[joint_a] = ind_a
+                            found_subset_1[-1] += 1
+                            found_subset_1[-2] += candidate_peaks[ind_a, 3] + score
+                        elif found_subset_1[joint_b] == -1:
+                            found_subset_1[joint_b] = ind_b
+                            found_subset_1[-1] += 1
+                            found_subset_1[-2] += candidate_peaks[ind_b, 3] + score
+                        if found_subset_2[joint_a] == -1:
+                            found_subset_2[joint_a] = ind_a
+                            found_subset_2[-1] += 1
+                            found_subset_2[-2] += candidate_peaks[ind_a, 3] + score
+                        elif found_subset_2[joint_b] == -1:
+                            found_subset_2[joint_b] = ind_b
+                            found_subset_2[-1] += 1
+                            found_subset_2[-2] += candidate_peaks[ind_b, 3] + score
 
-                elif joint_found_cnt == 0 and connection_category_index < 17: # 肩耳のconnectionは新規group対象外
+                elif joint_found_cnt == 0 and l != 9 and l != 13: # 新規subset作成, 肩耳のconnectionは新規group対象外
                     row = -1 * np.ones(20)
-                    row[joint_category_a_index] = joint_a_indices[connection_index]
-                    row[joint_category_b_index] = joint_b_indices[connection_index]
+                    row[joint_a] = ind_a
+                    row[joint_b] = ind_b
                     row[-1] = 2
-                    row[-2] = sum(candidate_peaks[all_connections[connection_category_index][connection_index, :2].astype(int), 3]) + all_connections[connection_category_index][connection_index][2]
+                    row[-2] = sum(candidate_peaks[[ind_a, ind_b], 3]) + score
                     subsets = np.vstack([subsets, row])
+                elif joint_found_cnt >= 3:
+                    print('more than 3 subsets have any joint')
 
         # delete low score subsets
         keep = np.logical_and(subsets[:, -1] >= params['n_subset_limbs_thresh'], subsets[:, -2]/subsets[:, -1] >= params['subset_score_thresh'])
@@ -438,12 +450,11 @@ class PoseDetector(object):
         interpolation = cv2.INTER_CUBIC
 
         for scale in params['inference_scales']:
-            print("Inference scale: %.1f..." % (scale))
+            print('Inference scale: {:.1f}...'.format(scale))
 
             multiplier = scale * params['inference_img_size'] / min(orig_img.shape[:2])
-            # print(multiplier)
             img = cv2.resize(orig_img, (0, 0), fx=multiplier, fy=multiplier, interpolation=interpolation)
-            padded_img, pad = self.pad_image(img, params['downscale'], 128)
+            padded_img, pad = self.pad_image(img, params['downscale'], (104, 117, 123))
 
             x_data = self.preprocess(padded_img)
             if self.device >= 0:
@@ -469,13 +480,18 @@ class PoseDetector(object):
             tmp_heatmap = tmp_heatmap[:padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1], :]
             heatmaps_sum += cv2.resize(tmp_heatmap, (orig_img_w, orig_img_h), interpolation=interpolation)
 
+            # tmp_heatmap = h2s[-1]
+            # tmp_heatmap = F.resize_images(tmp_heatmap, (x_data.shape[2], x_data.shape[3]))
+            # tmp_heatmap = tmp_heatmap[:, :, :padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1]]
+            # heatmaps_sum += F.resize_images(tmp_heatmap, (orig_img_h, orig_img_w)).data[0]
+
         pafs = (pafs_sum / len(params['inference_scales'])).transpose(2, 0, 1)
         heatmaps = (heatmaps_sum / len(params['inference_scales'])).transpose(2, 0, 1)
+        # heatmaps = (heatmaps_sum / len(params['inference_scales']))
 
-        if self.device >= 0:
-            cuda.get_device_from_id(self.device).synchronize()
-
-        print('forward: {:.2f}'.format(time.time() - st))
+        # if self.device >= 0:
+        #     cuda.get_device_from_id(self.device).synchronize()
+        # print('forward: {:.2f}s'.format(time.time() - st))
 
         all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
         if len(all_peaks) == 0:
@@ -485,7 +501,7 @@ class PoseDetector(object):
         poses = self.subsets_to_pose_array(subsets, all_peaks)
         return poses
 
-    def __call__(self, orig_img, fast_mode=False):
+    def __call__(self, orig_img):
         if self.precise:
             return self.detect_precise(orig_img)
         st = time.time()
@@ -495,11 +511,11 @@ class PoseDetector(object):
 
         pafs_sum = 0
         heatmaps_sum = 0
-        # use only the first scale on fast mode
-        scales = [0.5] if fast_mode else params['inference_scales']
+
+        scales = params['inference_scales']
 
         for scale in scales:
-            print("Inference scale: %.1f..." % (scale))
+            print('Inference scale: {:.1f}...'.format(scale))
             img_size = int(params['inference_img_size'] * scale)
             resized_input_img_w, resized_input_img_h = self.compute_optimal_size(orig_img, img_size)
 
@@ -523,8 +539,7 @@ class PoseDetector(object):
         if self.device >= 0:
             pafs = pafs.get()
             cuda.get_device_from_id(self.device).synchronize()
-
-        print('forward: {:.2f}'.format(time.time() - st))
+        print('forward: {:.2f}s'.format(time.time() - st))
 
         all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
         if len(all_peaks) == 0:
@@ -559,7 +574,7 @@ def draw_person_pose(orig_img, poses):
     # limbs
     for pose in poses.round().astype('i'):
         for i, (limb, color) in enumerate(zip(params['limbs_point'], limb_colors)):
-            if i != 9 and i != 13:  # don't show ear-shoulder connection
+            # if i != 9 and i != 13:  # don't show ear-shoulder connection
                 limb_ind = np.array(limb)
                 if np.all(pose[limb_ind][:, 2] != 0):
                     joint1, joint2 = pose[limb_ind][:, :2]
@@ -569,7 +584,7 @@ def draw_person_pose(orig_img, poses):
     for pose in poses.round().astype('i'):
         for i, ((x, y, v), color) in enumerate(zip(pose, joint_colors)):
             if v != 0:
-                cv2.circle(canvas, (x, y), 6, color, -1)
+                cv2.circle(canvas, (x, y), 1, color, -1)  # 6
     return canvas
 
 if __name__ == '__main__':
@@ -578,6 +593,7 @@ if __name__ == '__main__':
     parser.add_argument('weights', help='weights file path')
     parser.add_argument('--img', '-i', default=None, help='image file path')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--mask', action='store_true')
     parser.add_argument('--precise', action='store_true', help='visualize results')
     args = parser.parse_args()
 
@@ -585,16 +601,17 @@ if __name__ == '__main__':
     chainer.config.train = False
 
     # load model
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=False)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask)
 
-    while True:
+    # while True:
+    for i in range(20):
         # read image
         img = cv2.imread(args.img)
 
         # inference
         st = time.time()
         poses = pose_detector(img)
-        print('inference: {:.2f}'.format(time.time() - st))
+        print('inference time: {:.2f}s, {} persons are detected.'.format(time.time() - st, len(poses)))
 
         # draw and save image
         img = draw_person_pose(img, poses)

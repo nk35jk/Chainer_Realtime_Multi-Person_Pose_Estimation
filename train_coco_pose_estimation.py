@@ -4,6 +4,7 @@ import copy
 import json
 import glob
 import random
+import datetime
 import numpy as np
 import multiprocessing
 import matplotlib.pyplot as plt
@@ -231,22 +232,6 @@ class Evaluator(extensions.Evaluator):
 if __name__ == '__main__':
     args = parse_args()
 
-    model = params['archs'][args.arch](compute_mask=args.mask)
-
-    if args.arch == 'posenet':
-        posenet.copy_vgg_params(model)
-    elif args.arch == 'nn1':
-        nn1.copy_squeezenet_params(model.squeeze)
-    elif args.arch == 'resnetfpn':
-        chainer.serializers.load_npz('models/resnet50.npz', model.res)
-
-    if args.initmodel:
-        print('Load model from', args.initmodel)
-        chainer.serializers.load_npz(args.initmodel, model)
-    if args.gpu >= 0:
-        chainer.cuda.get_device_from_id(args.gpu).use()
-        model.to_gpu()
-
     # Load the datasets
     coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
@@ -269,6 +254,31 @@ if __name__ == '__main__':
         # eval_iter = chainer.iterators.SerialIterator(
         #     eval_loader, 1, repeat=False, shuffle=False)
 
+    if not os.path.exists(args.out):
+        os.makedirs(args.out)
+    txt = '@{}'.format(datetime.datetime.now().strftime('%y%m%d_%H%M'))
+    with open(os.path.join(args.out, txt), 'w') as f:
+        pass
+    with open(os.path.join(args.out, 'params.json'), 'w') as f:
+        json.dump(vars(args), f)
+
+    # Prepare model
+    model = params['archs'][args.arch](compute_mask=args.mask)
+
+    if args.arch == 'posenet':
+        posenet.copy_vgg_params(model)
+    elif args.arch == 'nn1':
+        nn1.copy_squeezenet_params(model.squeeze)
+    elif args.arch == 'resnetfpn':
+        chainer.serializers.load_npz('models/resnet50.npz', model.res)
+
+    if args.initmodel:
+        print('Load model from', args.initmodel)
+        chainer.serializers.load_npz(args.initmodel, model)
+    if args.gpu >= 0:
+        chainer.cuda.get_device_from_id(args.gpu).use()
+        model.to_gpu()
+
     # Set up an optimizer
     # optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
     optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
@@ -276,13 +286,14 @@ if __name__ == '__main__':
     # optimizer.add_hook(chainer.optimizer.WeightDecay(5e-4))
 
     # Fix base network parameters
-    if args.arch == 'posenet':
-        layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
-                       'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
-        for layer_name in layer_names:
-            model[layer_name].disable_update()
-    elif args.arch == 'resnetfpn':
-        model.res.disable_update()
+    if not args.resume:
+        if args.arch == 'posenet':
+            layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                           'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
+            for layer_name in layer_names:
+                model[layer_name].disable_update()
+        elif args.arch == 'resnetfpn':
+            model.res.disable_update()
 
     # Set up a trainer
     updater = Updater(train_iter, model, optimizer, args.mask, device=args.gpu)
@@ -291,6 +302,8 @@ if __name__ == '__main__':
     val_interval = (10 if args.test else 1000), 'iteration'
     log_interval = (1 if args.test else 20), 'iteration'
 
+
+    # trainer.extend(extensions.LinearShift('alpha', (1e-4, 5e-6), (1, 1000000)))
     trainer.extend(Validator(val_iter, model, args.mask, device=args.gpu),
                    trigger=val_interval)
     # trainer.extend(Evaluator(coco_val, eval_iter, model, args.mask, device=args.gpu),
