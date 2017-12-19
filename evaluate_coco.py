@@ -66,7 +66,6 @@ def evaluate():
                 if joint is not None and jt in params['coco_joint_indices']:
                     j = params['coco_joint_indices'].index(jt)
                     keypoints[j] = joint
-            keypoints[:, :2] -= 0.5
             res_dict['keypoints'] = keypoints.ravel()
             res.append(res_dict)
 

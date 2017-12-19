@@ -150,7 +150,7 @@ class PoseDetector(object):
                     n_valid_points = sum(inner_products > params['inner_product_thresh'])
                     if n_valid_points > params['n_integ_points_thresh'] and integ_value_with_dist_prior > 0:
                         candidate_connections.append([int(joint_a[3]), int(joint_b[3]), integ_value_with_dist_prior])
-            candidate_connections_ = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
+            candidate_connections = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
         else:
             grid_a = xp.tile(cand_a.T[:, :, None], len(cand_b))
             grid_b = xp.tile(cand_b.T[:, :, None], len(cand_a)).transpose(0, 2, 1)
