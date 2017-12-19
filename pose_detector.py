@@ -610,7 +610,7 @@ def draw_person_pose(orig_img, poses):
     for pose in poses.round().astype('i'):
         for i, ((x, y, v), color) in enumerate(zip(pose, joint_colors)):
             if v != 0:
-                cv2.circle(canvas, (x, y), 1, color, -1)  # 6
+                cv2.circle(canvas, (x, y), 6, color, -1)
     return canvas
 
 if __name__ == '__main__':
