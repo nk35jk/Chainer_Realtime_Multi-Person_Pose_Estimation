@@ -56,10 +56,10 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
         stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
         stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
 
-        # pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
-        pafs_loss = F.sum(F.mean(F.squared_error(pafs_y, stage_pafs_t), axis=0))
-        # heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
-        heatmaps_loss = F.sum(F.mean(F.squared_error(heatmaps_y, stage_heatmaps_t), axis=0))
+        pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
+        # pafs_loss = F.sum(F.mean(F.squared_error(pafs_y, stage_pafs_t), axis=0))
+        heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
+        # heatmaps_loss = F.sum(F.mean(F.squared_error(heatmaps_y, stage_heatmaps_t), axis=0))
         mask_loss = 0
         if compute_mask:
             mask_loss = F.softmax_cross_entropy(masks_y, stage_stuff_mask)
@@ -284,10 +284,10 @@ if __name__ == '__main__':
         model.to_gpu()
 
     # Set up an optimizer
-    optimizer = optimizers.MomentumSGD(lr=4e-5, momentum=0.9)
+    optimizer = optimizers.MomentumSGD(lr=1e-3, momentum=0.9)
     # optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
-    optimizer.add_hook(chainer.optimizer.WeightDecay(5e-4))
+    optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
 
     # Fix base network parameters
     if not args.resume:
