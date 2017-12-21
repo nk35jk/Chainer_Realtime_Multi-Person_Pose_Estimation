@@ -46,8 +46,8 @@ def evaluate():
     # for i in range(len(eval_loader)):
     for i in range(100):
     # for i in [1]:
-        print(i)
         img, annotations, img_id = eval_loader.get_example(i)
+        print(i, img_id)
 
         imgIds.append(img_id)
 
@@ -71,7 +71,7 @@ def evaluate():
 
         if args.vis:
             img = draw_person_pose(img, poses)
-            cv2.imwrite('result/img/result_{:012d}.png'.format(img_id), img)
+            cv2.imwrite('result/img/result_{:08d}.png'.format(img_id), img)
 
             # for ann in annotations:
             #     for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):

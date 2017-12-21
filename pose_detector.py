@@ -535,7 +535,7 @@ class PoseDetector(object):
             [255, 0, 255], [255, 0, 170], [255, 0, 85]]
         for all_peak in all_peaks:
             cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
-        cv2.imwrite('result/img/peaks_{:012d}.png'.format(img_id), orig_img)
+        cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
         ###
         return poses
 
