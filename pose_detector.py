@@ -504,8 +504,9 @@ class PoseDetector(object):
                 tmp_paf = cuda.to_cpu(tmp_paf)
                 tmp_heatmap = cuda.to_cpu(tmp_heatmap)
 
-            tmp_paf = cv2.resize(tmp_paf, (0, 0), fx=params['downscale'], fy=params['downscale'], interpolation=interpolation)
-            tmp_paf = tmp_paf[:padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1], :]
+            p_h, p_w = padded_img.shape[:2]
+            tmp_paf = cv2.resize(tmp_paf, (p_w, p_h), interpolation=interpolation)
+            tmp_paf = tmp_paf[:p_h-pad[0], :p_w-pad[1], :]
             pafs_sum += cv2.resize(tmp_paf, (orig_img_w, orig_img_h), interpolation=interpolation)
 
             tmp_heatmap = cv2.resize(tmp_heatmap, (0, 0), fx=params['downscale'], fy=params['downscale'], interpolation=interpolation)
