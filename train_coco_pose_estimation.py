@@ -308,7 +308,6 @@ if __name__ == '__main__':
     val_interval = (10 if args.test else 1000), 'iteration'
     log_interval = (1 if args.test else 20), 'iteration'
 
-
     # trainer.extend(extensions.LinearShift('alpha', (1e-4, 5e-6), (1, 1000000)))
     trainer.extend(Validator(val_iter, model, args.mask, device=args.gpu),
                    trigger=val_interval)
