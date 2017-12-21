@@ -52,7 +52,7 @@ def evaluate():
         imgIds.append(img_id)
 
         st = time.time()
-        poses = pose_detector(img)
+        poses = pose_detector(img, img_id)
         print('inference: {:.2f}s'.format(time.time() - st))
 
         for pose in poses:
@@ -71,13 +71,14 @@ def evaluate():
 
         if args.vis:
             img = draw_person_pose(img, poses)
+            cv2.imwrite('result/img/result_{:012d}.png'.format(img_id), img)
 
-            for ann in annotations:
-                for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):
-                    cv2.circle(img, tuple(joint.tolist()), 3, (0, 0, 255), -1)
+            # for ann in annotations:
+            #     for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):
+            #         cv2.circle(img, tuple(joint.tolist()), 3, (0, 0, 255), -1)
 
-            cv2.imshow('results', img)
-            cv2.waitKey(1)
+            # cv2.imshow('results', img)
+            # cv2.waitKey(1)
 
         # # GT (test)
         # for ann in annotations:

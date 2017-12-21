@@ -463,7 +463,7 @@ class PoseDetector(object):
         x_data = x_data.transpose(2, 0, 1)[None]
         return x_data
 
-    def detect_precise(self, orig_img):
+    def detect_precise(self, orig_img, img_id):
         st = time.time()
         orig_img_h, orig_img_w, _ = orig_img.shape
 
@@ -525,11 +525,24 @@ class PoseDetector(object):
         all_connections = self.compute_connections(pafs, all_peaks, orig_img_w, params)
         subsets = self.grouping_key_points(all_connections, all_peaks, params)
         poses = self.subsets_to_pose_array(subsets, all_peaks)
+
+        ### for debug
+        print('Number of candidate peaks: {}'.format(len(all_peaks)))
+        joint_colors = [
+            [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0],
+            [85, 255, 0], [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255],
+            [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], [170, 0, 255],
+            [255, 0, 255], [255, 0, 170], [255, 0, 85]]
+        for all_peak in all_peaks:
+            cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
+        cv2.imwrite('result/img/peaks_{:012d}.png'.format(img_id), orig_img)
+        ###
         return poses
 
-    def __call__(self, orig_img):
+    def __call__(self, orig_img, img_id):
+        orig_img = orig_img.copy()
         if self.precise:
-            return self.detect_precise(orig_img)
+            return self.detect_precise(orig_img, img_id)
         st = time.time()
         orig_img_h, orig_img_w, _ = orig_img.shape
 
@@ -610,7 +623,7 @@ def draw_person_pose(orig_img, poses):
     for pose in poses.round().astype('i'):
         for i, ((x, y, v), color) in enumerate(zip(pose, joint_colors)):
             if v != 0:
-                cv2.circle(canvas, (x, y), 6, color, -1)
+                cv2.circle(canvas, (x, y), 3, color, -1)
     return canvas
 
 if __name__ == '__main__':
