@@ -72,7 +72,7 @@ params = {
     'max_scale': 2.0,
     'max_rotate_degree': 40,
     'center_perterb_max': 40,
-    'mask_loss_ratio': 0.005,
+    'mask_loss_ratio': 0.1,
 
     # inference params
     'inference_img_size': 368,

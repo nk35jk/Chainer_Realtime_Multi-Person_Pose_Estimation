@@ -1,4 +1,5 @@
 import cv2
+import math
 import time
 import argparse
 import numpy as np
@@ -463,7 +464,7 @@ class PoseDetector(object):
         x_data = x_data.transpose(2, 0, 1)[None]
         return x_data
 
-    def detect_precise(self, orig_img, img_id):
+    def detect_precise(self, orig_img):
         st = time.time()
         orig_img_h, orig_img_w, _ = orig_img.shape
 
@@ -477,8 +478,15 @@ class PoseDetector(object):
             # print('Inference scale: {:.1f}...'.format(scale))
 
             multiplier = scale * params['inference_img_size'] / min(orig_img.shape[:2])
-            img = cv2.resize(orig_img, (0, 0), fx=multiplier, fy=multiplier, interpolation=interpolation)
-            padded_img, pad = self.pad_image(img, params['downscale'], (104, 117, 123))
+            img = cv2.resize(orig_img, (math.ceil(orig_img_w*multiplier), math.ceil(orig_img_h*multiplier)), interpolation=interpolation)
+            bbox = (params['inference_img_size'], max(params['inference_img_size'], img.shape[1]))
+            padded_img, pad = self.pad_image(img, params['downscale'], 128)  # (104, 117, 123)
+
+            print('')
+            print(img.shape)
+            print(bbox)
+            print(multiplier)
+            print(padded_img.shape)
 
             x_data = self.preprocess(padded_img)
             if self.device >= 0:
@@ -526,23 +534,23 @@ class PoseDetector(object):
         subsets = self.grouping_key_points(all_connections, all_peaks, params)
         poses = self.subsets_to_pose_array(subsets, all_peaks)
 
-        ### for debug
-        print('Number of candidate peaks: {}'.format(len(all_peaks)))
-        joint_colors = [
-            [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0],
-            [85, 255, 0], [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255],
-            [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], [170, 0, 255],
-            [255, 0, 255], [255, 0, 170], [255, 0, 85]]
-        for all_peak in all_peaks:
-            cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
-        cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
-        ###
+        # ### for debug
+        # print('Number of candidate peaks: {}'.format(len(all_peaks)))
+        # joint_colors = [
+        #     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0],
+        #     [85, 255, 0], [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255],
+        #     [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], [170, 0, 255],
+        #     [255, 0, 255], [255, 0, 170], [255, 0, 85]]
+        # for all_peak in all_peaks:
+        #     cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
+        # cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
+        # ###
         return poses
 
-    def __call__(self, orig_img, img_id):
+    def __call__(self, orig_img):
         orig_img = orig_img.copy()
         if self.precise:
-            return self.detect_precise(orig_img, img_id)
+            return self.detect_precise(orig_img)
         st = time.time()
         orig_img_h, orig_img_w, _ = orig_img.shape
 

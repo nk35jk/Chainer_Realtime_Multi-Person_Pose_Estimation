@@ -32,29 +32,38 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
 
     paf_masks = ignore_mask[:, None].repeat(pafs_t.shape[1], axis=1)
     heatmap_masks = ignore_mask[:, None].repeat(heatmaps_t.shape[1], axis=1)
+    mask_masks = ignore_mask[:, None].repeat(2, axis=1)
 
     for pafs_y, heatmaps_y, masks_y in zip(pafs_ys, heatmaps_ys, masks_ys): # compute loss on each stage
         stage_pafs_t = pafs_t.copy()
         stage_heatmaps_t = heatmaps_t.copy()
+        stage_mask_t = stuff_mask.copy().astype('f')
         stage_paf_masks = paf_masks.copy()
         stage_heatmap_masks = heatmap_masks.copy()
-        stage_stuff_mask = stuff_mask.copy()
+        stage_mask_masks = mask_masks.copy()
+
 
         if pafs_y.shape != stage_pafs_t.shape:
             stage_pafs_t = F.resize_images(stage_pafs_t, pafs_y.shape[2:]).data
             stage_heatmaps_t = F.resize_images(stage_heatmaps_t, pafs_y.shape[2:]).data
             stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
             stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
+            stage_mask_masks = F.resize_images(stage_mask_masks.astype('f'), pafs_y.shape[2:]).data > 0
 
             if device >= 0:
-                stage_stuff_mask = cuda.to_cpu(stage_stuff_mask)
-            stage_stuff_mask = cv2.resize(stage_stuff_mask.transpose(1, 2, 0),
+                stage_mask_t = cuda.to_cpu(stage_mask_t)
+            stage_mask_t = cv2.resize(stage_mask_t.transpose(1, 2, 0),
                 pafs_y.shape[2:], interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
             if device >= 0:
-                stage_stuff_mask = cuda.to_gpu(stage_stuff_mask)
+                stage_mask_t = cuda.to_gpu(stage_mask_t)
+
+        xp = cuda.get_array_module(stage_mask_t)
+        stage_mask_t = xp.stack((stage_mask_t, -(stage_mask_t-1)), axis=1)  # for mean_squared_error
 
         stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
         stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
+        stage_mask_t[stage_mask_masks == True] = masks_y.data[stage_mask_masks == True]
+        stage_mask_t[(stage_mask_t == -1) | (stage_mask_t == 2)] = masks_y.data[(stage_mask_t == -1) | (stage_mask_t == 2)]
 
         pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
         # pafs_loss = F.sum(F.mean(F.squared_error(pafs_y, stage_pafs_t), axis=0))
@@ -62,7 +71,8 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
         # heatmaps_loss = F.sum(F.mean(F.squared_error(heatmaps_y, stage_heatmaps_t), axis=0))
         mask_loss = 0
         if compute_mask:
-            mask_loss = F.softmax_cross_entropy(masks_y, stage_stuff_mask)
+            # mask_loss = F.softmax_cross_entropy(masks_y, stage_mask_t)
+            mask_loss = F.mean_squared_error(masks_y, stage_mask_t)
         total_loss += pafs_loss + heatmaps_loss + params['mask_loss_ratio'] * mask_loss
 
         paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
@@ -284,10 +294,10 @@ if __name__ == '__main__':
         model.to_gpu()
 
     # Set up an optimizer
-    optimizer = optimizers.MomentumSGD(lr=1e-3, momentum=0.9)
-    # optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
+    # optimizer = optimizers.MomentumSGD(lr=1e-3, momentum=0.9)
+    optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
-    optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
+    # optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
 
     # Fix base network parameters
     if not args.resume:
