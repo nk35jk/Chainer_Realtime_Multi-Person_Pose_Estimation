@@ -82,7 +82,7 @@ class PoseDetector(object):
             all_peaks = []
             peak_counter = 0
             for i , heatmap in enumerate(heatmaps):
-                heatmap = gaussian_filter(heatmap, sigma=params['gaussian_sigma'])
+                # heatmap = gaussian_filter(heatmap, sigma=params['gaussian_sigma'])
                 map_left = xp.zeros(heatmap.shape)
                 map_right = xp.zeros(heatmap.shape)
                 map_top = xp.zeros(heatmap.shape)
