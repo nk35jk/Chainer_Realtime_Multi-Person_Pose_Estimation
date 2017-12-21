@@ -52,7 +52,7 @@ def evaluate():
         imgIds.append(img_id)
 
         st = time.time()
-        poses = pose_detector(img, img_id)
+        poses = pose_detector(img)
         print('inference: {:.2f}s'.format(time.time() - st))
 
         for pose in poses:
