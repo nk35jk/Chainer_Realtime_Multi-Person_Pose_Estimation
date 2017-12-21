@@ -62,8 +62,9 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
 
         stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
         stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
-        stage_mask_t[stage_mask_masks == True] = masks_y.data[stage_mask_masks == True]
-        stage_mask_t[(stage_mask_t == -1) | (stage_mask_t == 2)] = masks_y.data[(stage_mask_t == -1) | (stage_mask_t == 2)]
+        if compute_mask:
+            stage_mask_t[stage_mask_masks == True] = masks_y.data[stage_mask_masks == True]
+            stage_mask_t[(stage_mask_t == -1) | (stage_mask_t == 2)] = masks_y.data[(stage_mask_t == -1) | (stage_mask_t == 2)]
 
         pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
         # pafs_loss = F.sum(F.mean(F.squared_error(pafs_y, stage_pafs_t), axis=0))
