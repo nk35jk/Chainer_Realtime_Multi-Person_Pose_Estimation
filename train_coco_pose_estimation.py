@@ -307,12 +307,12 @@ if __name__ == '__main__':
     # Prepare model
     model = params['archs'][args.arch](compute_mask=args.mask)
 
-    # if args.arch == 'posenet':
-    #     posenet.copy_vgg_params(model)
-    # elif args.arch == 'nn1':
-    #     nn1.copy_squeezenet_params(model.squeeze)
-    # elif args.arch == 'resnetfpn':
-    #     chainer.serializers.load_npz('models/resnet50.npz', model.res)
+    if args.arch == 'posenet':
+        posenet.copy_vgg_params(model)
+    elif args.arch == 'nn1':
+        nn1.copy_squeezenet_params(model.squeeze)
+    elif args.arch == 'resnetfpn':
+        chainer.serializers.load_npz('models/resnet50.npz', model.res)
 
     if args.initmodel:
         print('Load model from', args.initmodel)
