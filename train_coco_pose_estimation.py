@@ -127,7 +127,6 @@ class Updater(StandardUpdater):
         optimizer = self.get_optimizer('main')
 
         # Update base network parameters
-        print('iteration: {}'.format(self.iteration))
         if self.iteration == 2000:
             if args.arch == 'posenet':
                 layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
@@ -167,8 +166,6 @@ class Updater(StandardUpdater):
         optimizer.target.cleargrads()
         loss.backward()
         optimizer.update()
-
-        import ipdb; ipdb.set_trace()
 
 
 class Validator(extensions.Evaluator):
