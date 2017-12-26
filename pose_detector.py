@@ -522,6 +522,9 @@ class PoseDetector(object):
         heatmaps = (heatmaps_sum / len(params['inference_scales'])).transpose(2, 0, 1)
         # heatmaps = (heatmaps_sum / len(params['inference_scales']))
 
+        # plt.imshow(orig_img[..., ::-1])
+        # plt.imshow(heatmaps[2], alpha=.5, cmap='jet')
+
         # if self.device >= 0:
         #     pafs = cuda.to_gpu(pafs)
         #     heatmaps = cuda.to_gpu(heatmaps)
