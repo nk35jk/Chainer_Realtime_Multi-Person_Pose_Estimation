@@ -24,6 +24,24 @@ from pose_detector import PoseDetector, draw_person_pose
 from models import CocoPoseNet, posenet, nn1, resnetfpn
 
 
+class GradientScaling(object):
+
+    name = 'GradientScaling'
+
+    def __init__(self, scale):
+        self.scale = scale
+
+    def __call__(self, opt):
+        layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                       'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
+                       'conv4_3_CPM', 'conv4_4_CPM']
+        for layer_name in layer_names:
+            for param in opt.target[layer_name].params(False):
+                grad = param.grad
+                with cuda.get_device_from_array(grad):
+                    grad *= self.scale
+
+
 def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignore_mask, stuff_mask, compute_mask, device):
     heatmap_loss_log = []
     paf_loss_log = []
@@ -109,6 +127,7 @@ class Updater(StandardUpdater):
         optimizer = self.get_optimizer('main')
 
         # Update base network parameters
+        print('iteration: {}'.format(self.iteration))
         if self.iteration == 2000:
             if args.arch == 'posenet':
                 layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
@@ -119,6 +138,9 @@ class Updater(StandardUpdater):
                 optimizer.target.res.enable_update()
             elif args.arch == 'nn1':
                 model.squeeze.enable_update()
+
+        if 100000 <= self.iteration < 200000:
+            optimizer.alpha = 1e-5
 
         batch = train_iter.next()
 
@@ -145,6 +167,8 @@ class Updater(StandardUpdater):
         optimizer.target.cleargrads()
         loss.backward()
         optimizer.update()
+
+        import ipdb; ipdb.set_trace()
 
 
 class Validator(extensions.Evaluator):
@@ -247,6 +271,9 @@ class Evaluator(extensions.Evaluator):
 if __name__ == '__main__':
     args = parse_args()
 
+    np.random.seed(0)
+    random.seed(0)
+
     # Load the datasets
     coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
@@ -280,12 +307,12 @@ if __name__ == '__main__':
     # Prepare model
     model = params['archs'][args.arch](compute_mask=args.mask)
 
-    if args.arch == 'posenet':
-        posenet.copy_vgg_params(model)
-    elif args.arch == 'nn1':
-        nn1.copy_squeezenet_params(model.squeeze)
-    elif args.arch == 'resnetfpn':
-        chainer.serializers.load_npz('models/resnet50.npz', model.res)
+    # if args.arch == 'posenet':
+    #     posenet.copy_vgg_params(model)
+    # elif args.arch == 'nn1':
+    #     nn1.copy_squeezenet_params(model.squeeze)
+    # elif args.arch == 'resnetfpn':
+    #     chainer.serializers.load_npz('models/resnet50.npz', model.res)
 
     if args.initmodel:
         print('Load model from', args.initmodel)
@@ -299,6 +326,7 @@ if __name__ == '__main__':
     optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
     # optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
+    optimizer.add_hook(GradientScaling(1/4))
 
     # Fix base network parameters
     if not args.resume:
