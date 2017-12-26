@@ -480,7 +480,7 @@ class PoseDetector(object):
             multiplier = scale * params['inference_img_size'] / min(orig_img.shape[:2])
             img = cv2.resize(orig_img, (math.ceil(orig_img_w*multiplier), math.ceil(orig_img_h*multiplier)), interpolation=interpolation)
             bbox = (params['inference_img_size'], max(params['inference_img_size'], img.shape[1]))
-            padded_img, pad = self.pad_image(img, params['downscale'], 128)  # (104, 117, 123)
+            padded_img, pad = self.pad_image(img, params['downscale'], (104, 117, 123))
 
             print('')
             print(img.shape)
