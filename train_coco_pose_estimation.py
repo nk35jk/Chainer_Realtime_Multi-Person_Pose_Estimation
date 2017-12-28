@@ -52,14 +52,14 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
     heatmap_masks = ignore_mask[:, None].repeat(heatmaps_t.shape[1], axis=1)
     mask_masks = ignore_mask[:, None].repeat(2, axis=1)
 
-    for pafs_y, heatmaps_y, masks_y in zip(pafs_ys, heatmaps_ys, masks_ys): # compute loss on each stage
+    # compute loss on each stage
+    for pafs_y, heatmaps_y, masks_y in zip(pafs_ys, heatmaps_ys, masks_ys):
         stage_pafs_t = pafs_t.copy()
         stage_heatmaps_t = heatmaps_t.copy()
         stage_mask_t = stuff_mask.copy().astype('f')
         stage_paf_masks = paf_masks.copy()
         stage_heatmap_masks = heatmap_masks.copy()
         stage_mask_masks = mask_masks.copy()
-
 
         if pafs_y.shape != stage_pafs_t.shape:
             stage_pafs_t = F.resize_images(stage_pafs_t, pafs_y.shape[2:]).data
