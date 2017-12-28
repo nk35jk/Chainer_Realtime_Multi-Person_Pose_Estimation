@@ -323,7 +323,8 @@ if __name__ == '__main__':
     optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
     # optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
-    optimizer.add_hook(GradientScaling(1/4))
+    if args.arch == 'posenet':
+        optimizer.add_hook(GradientScaling(1/4))
 
     # Fix base network parameters
     if not args.resume:

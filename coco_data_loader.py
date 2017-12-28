@@ -376,6 +376,7 @@ class CocoDataLoader(DatasetMixin):
 
         heatmaps = self.generate_heatmaps(resized_img, resized_poses, params['heatmap_sigma'])
         pafs = self.generate_pafs(resized_img, resized_poses, params['paf_sigma'])
+        ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
         return resized_img, pafs, heatmaps, ignore_mask, resized_stuff
 
     def get_example(self, i):

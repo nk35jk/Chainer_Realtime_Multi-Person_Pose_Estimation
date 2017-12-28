@@ -481,12 +481,12 @@ class PoseDetector(object):
             img = cv2.resize(orig_img, (math.ceil(orig_img_w*multiplier), math.ceil(orig_img_h*multiplier)), interpolation=interpolation)
             bbox = (params['inference_img_size'], max(params['inference_img_size'], img.shape[1]))
             padded_img, pad = self.pad_image(img, params['downscale'], (104, 117, 123))
-
-            print('')
-            print(img.shape)
-            print(bbox)
-            print(multiplier)
-            print(padded_img.shape)
+            #
+            # print('')
+            # print(img.shape)
+            # print(bbox)
+            # print(multiplier)
+            # print(padded_img.shape)
 
             x_data = self.preprocess(padded_img)
             if self.device >= 0:
@@ -524,6 +524,7 @@ class PoseDetector(object):
 
         # plt.imshow(orig_img[..., ::-1])
         # plt.imshow(heatmaps[2], alpha=.5, cmap='jet')
+        # plt.show()
 
         # if self.device >= 0:
         #     pafs = cuda.to_gpu(pafs)
