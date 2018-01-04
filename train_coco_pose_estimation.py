@@ -152,7 +152,6 @@ class Updater(StandardUpdater):
         batch = train_iter.next()
 
         imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
-        print(imgs.shape)
 
         x_data = preprocess(imgs)
 
