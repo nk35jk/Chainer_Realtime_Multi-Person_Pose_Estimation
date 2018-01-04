@@ -298,12 +298,14 @@ if __name__ == '__main__':
     np.random.seed(0)
     random.seed(0)
 
+    model = params['archs'][args.arch](compute_mask=args.mask)
+
     # Load the datasets
     coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-    train_loader = CocoDataLoader(coco_train, params['insize'], mode='train')
-    val_loader = CocoDataLoader(coco_val, params['insize'], mode='val', n_samples=args.val_samples)
-    eval_loader = CocoDataLoader(coco_val, params['insize'], mode='eval', n_samples=args.eval_samples)
+    train_loader = CocoDataLoader(coco_train, model, mode='train')
+    val_loader = CocoDataLoader(coco_val, model, mode='val', n_samples=args.val_samples)
+    eval_loader = CocoDataLoader(coco_val, model, mode='eval', n_samples=args.eval_samples)
 
     if args.loaderjob:
         multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug
@@ -329,8 +331,6 @@ if __name__ == '__main__':
         json.dump(vars(args), f)
 
     # Prepare model
-    model = params['archs'][args.arch](compute_mask=args.mask)
-
     if args.arch == 'posenet':
         posenet.copy_vgg_params(model)
     elif args.arch in ['nn1', 'student']:
