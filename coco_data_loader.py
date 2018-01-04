@@ -13,7 +13,7 @@ from entity import JointType, params
 
 
 class CocoDataLoader(DatasetMixin):
-    def __init__(self, coco, model, mode='train', n_samples=None):
+    def __init__(self, coco, insize, mode='train', n_samples=None):
         self.coco = coco
         assert mode in ['train', 'val', 'eval'], 'Data loading mode is invalid.'
         self.mode = mode
@@ -23,7 +23,7 @@ class CocoDataLoader(DatasetMixin):
             random.seed(2)
             self.imgIds = random.sample(self.imgIds, n_samples)
         print('{} images: {}'.format(mode, len(self)))
-        self.insize = model.insize
+        self.insize = insize
 
     def __len__(self):
         return len(self.imgIds)
