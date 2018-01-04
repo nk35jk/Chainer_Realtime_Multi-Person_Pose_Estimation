@@ -7,6 +7,7 @@ from models.nn1 import NN1
 from models.resnetfpn import ResNetFPN
 from models.pspnet import PSPNet
 from models.student import Student
+from models.cpn import CPN
 
 from models.FaceNet import FaceNet
 from models.HandNet import HandNet
@@ -63,6 +64,7 @@ params = {
         'resnetfpn': ResNetFPN,
         'pspnet': PSPNet,
         'student': Student,
+        'cpn': CPN,
     },
     # training params
     'insize': 368,

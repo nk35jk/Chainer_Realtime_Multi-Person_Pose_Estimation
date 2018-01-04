@@ -21,7 +21,7 @@ from entity import JointType, params, parse_args
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
-from models import CocoPoseNet, posenet, nn1, resnetfpn, pspnet, student
+from models import CocoPoseNet, posenet, nn1, resnetfpn, pspnet, student, cpn
 
 
 class GradientScaling(object):
@@ -115,7 +115,7 @@ def preprocess(imgs):
     if args.arch in ['posenet']:
         x_data /= 255
         x_data -= 0.5
-    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'student']:
+    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'student', 'cpn']:
         x_data -= xp.array([104, 117, 123])
     x_data = x_data.transpose(0, 3, 1, 2)
     return x_data
@@ -139,10 +139,15 @@ class Updater(StandardUpdater):
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch in ['resnetfpn', 'pspnet']:
+            elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
                 optimizer.target.res.enable_update()
             elif args.arch in ['nn1', 'student']:
                 model.squeeze.enable_update()
+
+        if 100000 <= self.iteration < 200000:
+            optimizer.alpha = 1e-5
+        elif 200000 <= self.iteration:
+            optimizer.alpha = 1e-6
 
         batch = train_iter.next()
 
@@ -329,7 +334,7 @@ if __name__ == '__main__':
         posenet.copy_vgg_params(model)
     elif args.arch in ['nn1', 'student']:
         nn1.copy_squeezenet_params(model.squeeze)
-    elif args.arch in ['resnetfpn', 'pspnet']:
+    elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
         chainer.serializers.load_npz('models/resnet50.npz', model.res)
 
     if args.initmodel:
@@ -366,7 +371,7 @@ if __name__ == '__main__':
                            'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
             for layer_name in layer_names:
                 model[layer_name].disable_update()
-        elif args.arch in ['resnetfpn', 'pspnet']:
+        elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
             model.res.disable_update()
         elif args.arch in ['nn1', 'student']:
             model.squeeze.disable_update()

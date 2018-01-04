@@ -459,7 +459,7 @@ class PoseDetector(object):
         if self.arch in ['posenet']:
             x_data /= 255
             x_data -= 0.5
-        elif self.arch in ['nn1', 'resnetfpn', 'pspnet', 'student']:
+        elif self.arch in ['nn1', 'resnetfpn', 'pspnet', 'student', 'cpn']:
             x_data -= np.array([104, 117, 123])
         x_data = x_data.transpose(2, 0, 1)[None]
         return x_data
