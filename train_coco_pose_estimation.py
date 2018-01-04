@@ -152,6 +152,7 @@ class Updater(StandardUpdater):
         batch = train_iter.next()
 
         imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
+        print(imgs.shape)
 
         x_data = preprocess(imgs)
 
@@ -300,9 +301,9 @@ if __name__ == '__main__':
     # Load the datasets
     coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-    train_loader = CocoDataLoader(coco_train, mode='train')
-    val_loader = CocoDataLoader(coco_val, mode='val', n_samples=args.val_samples)
-    eval_loader = CocoDataLoader(coco_val, mode='eval', n_samples=args.eval_samples)
+    train_loader = CocoDataLoader(coco_train, params['insize'], mode='train')
+    val_loader = CocoDataLoader(coco_val, params['insize'], mode='val', n_samples=args.val_samples)
+    eval_loader = CocoDataLoader(coco_val, params['insize'], mode='eval', n_samples=args.eval_samples)
 
     if args.loaderjob:
         multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug

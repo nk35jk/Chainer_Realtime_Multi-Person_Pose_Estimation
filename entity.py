@@ -197,5 +197,4 @@ def parse_args():
     parser.set_defaults(distill=False)
     args = parser.parse_args()
     params['insize'] = params['archs'][args.arch].insize
-    params['downscale'] = params['archs'][args.arch].downscale
     return args

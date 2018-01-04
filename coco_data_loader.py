@@ -13,7 +13,7 @@ from entity import JointType, params
 
 
 class CocoDataLoader(DatasetMixin):
-    def __init__(self, coco, mode='train', n_samples=None):
+    def __init__(self, coco, insize, mode='train', n_samples=None):
         self.coco = coco
         assert mode in ['train', 'val', 'eval'], 'Data loading mode is invalid.'
         self.mode = mode
@@ -23,6 +23,7 @@ class CocoDataLoader(DatasetMixin):
             random.seed(2)
             self.imgIds = random.sample(self.imgIds, n_samples)
         print('{} images: {}'.format(mode, len(self)))
+        self.insize = insize
 
     def __len__(self):
         return len(self.imgIds)
@@ -139,7 +140,7 @@ class CocoDataLoader(DatasetMixin):
 
     def random_crop_img(self, img, ignore_mask, stuff_mask, poses):
         h, w, _ = img.shape
-        insize = params['insize']
+        insize = self.insize
         joint_bboxes = self.get_pose_bboxes(poses)
         bbox = random.choice(joint_bboxes)  # select a bbox randomly
         bbox_center = bbox[:2] + (bbox[2:] - bbox[:2])/2
@@ -392,7 +393,7 @@ class CocoDataLoader(DatasetMixin):
 if __name__ == '__main__':
     mode = 'train'
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
-    data_loader = CocoDataLoader(coco, mode=mode)
+    data_loader = CocoDataLoader(coco, params['insize'], mode=mode)
 
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
