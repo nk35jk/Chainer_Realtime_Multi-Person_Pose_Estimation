@@ -21,28 +21,28 @@ from entity import JointType, params, parse_args
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
-from models import CocoPoseNet, posenet, nn1, resnetfpn
+from models import CocoPoseNet, posenet, nn1, resnetfpn, pspnet, student
 
 
 class GradientScaling(object):
 
     name = 'GradientScaling'
 
-    def __init__(self, scale):
+    def __init__(self, layer_names, scale):
+        self.layer_names = layer_names
         self.scale = scale
 
     def __call__(self, opt):
-        layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
-                       'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
-                       'conv4_3_CPM', 'conv4_4_CPM']
-        for layer_name in layer_names:
+        for layer_name in self.layer_names:
             for param in opt.target[layer_name].params(False):
                 grad = param.grad
                 with cuda.get_device_from_array(grad):
                     grad *= self.scale
 
 
-def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignore_mask, stuff_mask, compute_mask, device):
+def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t,
+                 pt_pafs, pt_heatmaps, ignore_mask, stuff_mask, compute_mask,
+                 device):
     heatmap_loss_log = []
     paf_loss_log = []
     mask_loss_log = []
@@ -85,14 +85,19 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t, ignor
             stage_mask_t[(stage_mask_t == -1) | (stage_mask_t == 2)] = masks_y.data[(stage_mask_t == -1) | (stage_mask_t == 2)]
 
         pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
-        # pafs_loss = F.sum(F.mean(F.squared_error(pafs_y, stage_pafs_t), axis=0))
         heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
         # heatmaps_loss = F.sum(F.mean(F.squared_error(heatmaps_y, stage_heatmaps_t), axis=0))
         mask_loss = 0
         if compute_mask:
             # mask_loss = F.softmax_cross_entropy(masks_y, stage_mask_t)
             mask_loss = F.mean_squared_error(masks_y, stage_mask_t)
-        total_loss += pafs_loss + heatmaps_loss + params['mask_loss_ratio'] * mask_loss
+
+        if pt_pafs is None:
+            total_loss += pafs_loss + heatmaps_loss + params['mask_loss_ratio'] * mask_loss
+        else:
+            soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs)
+            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps)
+            total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
 
         paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
         heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
@@ -110,7 +115,7 @@ def preprocess(imgs):
     if args.arch in ['posenet']:
         x_data /= 255
         x_data -= 0.5
-    elif args.arch in ['nn1', 'resnetfpn']:
+    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'student']:
         x_data -= xp.array([104, 117, 123])
     x_data = x_data.transpose(0, 3, 1, 2)
     return x_data
@@ -118,8 +123,9 @@ def preprocess(imgs):
 
 class Updater(StandardUpdater):
 
-    def __init__(self, iterator, model, optimizer, compute_mask, device=None):
+    def __init__(self, iterator, model, teacher, optimizer, compute_mask, device=None):
         super(Updater, self).__init__(iterator, optimizer, device=device)
+        self.teacher = teacher
         self.compute_mask = compute_mask
 
     def update_core(self):
@@ -133,9 +139,9 @@ class Updater(StandardUpdater):
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch == 'resnetfpn':
+            elif args.arch in ['resnetfpn', 'pspnet']:
                 optimizer.target.res.enable_update()
-            elif args.arch == 'nn1':
+            elif args.arch in ['nn1', 'student']:
                 model.squeeze.enable_update()
 
         if 100000 <= self.iteration < 200000:
@@ -153,8 +159,16 @@ class Updater(StandardUpdater):
             pafs_ys, heatmaps_ys = optimizer.target(x_data)
             masks_ys = [None] * len(pafs_ys)
 
+        pt_pafs = pt_heatmaps = None
+        if self.teacher:
+            x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+            h1s, h2s = self.teacher(x_data)
+            pt_pafs = h1s[-1].data
+            pt_heatmaps = h2s[-1].data
+
         loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
-            imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
+            imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, pt_pafs,
+            pt_heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
 
         reporter.report({
             'main/loss': loss,
@@ -170,10 +184,11 @@ class Updater(StandardUpdater):
 
 class Validator(extensions.Evaluator):
 
-    def __init__(self, iterator, model, compute_mask, device=None):
+    def __init__(self, iterator, model, teacher, compute_mask, device=None):
         super(Validator, self).__init__(iterator, model, device=device)
         self.iterator = iterator
         self.compute_mask = compute_mask
+        self.teacher = teacher
 
     def evaluate(self):
         val_iter = self.get_iterator('main')
@@ -196,8 +211,17 @@ class Validator(extensions.Evaluator):
                         pafs_ys, heatmaps_ys = model(x_data)
                         masks_ys = [None] * len(pafs_ys)
 
+                    pt_pafs = pt_heatmaps = None
+                    if self.teacher:
+                        x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+                        h1s, h2s = self.teacher(x_data)
+                        pt_pafs = h1s[-1]
+                        pt_heatmaps = h2s[-1]
+
                     loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
-                        imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
+                        imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, pt_pafs,
+                        pt_heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
+
                     observation['val/loss'] = cuda.to_cpu(loss.data)
                     observation['val/paf'] = sum(paf_loss_log)
                     observation['val/heat'] = sum(heatmap_loss_log)
@@ -306,14 +330,23 @@ if __name__ == '__main__':
 
     if args.arch == 'posenet':
         posenet.copy_vgg_params(model)
-    elif args.arch == 'nn1':
+    elif args.arch in ['nn1', 'student']:
         nn1.copy_squeezenet_params(model.squeeze)
-    elif args.arch == 'resnetfpn':
+    elif args.arch in ['resnetfpn', 'pspnet']:
         chainer.serializers.load_npz('models/resnet50.npz', model.res)
 
     if args.initmodel:
         print('Load model from', args.initmodel)
         chainer.serializers.load_npz(args.initmodel, model)
+
+    teacher = None
+    if args.distill:
+        teacher = posenet.PoseNet()
+        serializers.load_npz('models/posenet_iter_200000', teacher)
+        teacher.disable_update()
+        if args.gpu >= 0:
+            teacher.to_gpu()
+
     if args.gpu >= 0:
         chainer.cuda.get_device_from_id(args.gpu).use()
         model.to_gpu()
@@ -324,7 +357,10 @@ if __name__ == '__main__':
     optimizer.setup(model)
     # optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
     if args.arch == 'posenet':
-        optimizer.add_hook(GradientScaling(1/4))
+        layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                       'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
+                       'conv4_3_CPM', 'conv4_4_CPM']
+        optimizer.add_hook(GradientScaling(layer_names, 1/4))
 
     # Fix base network parameters
     if not args.resume:
@@ -333,20 +369,20 @@ if __name__ == '__main__':
                            'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
             for layer_name in layer_names:
                 model[layer_name].disable_update()
-        elif args.arch == 'resnetfpn':
+        elif args.arch in ['resnetfpn', 'pspnet']:
             model.res.disable_update()
-        elif args.arch == 'nn1':
+        elif args.arch in ['nn1', 'student']:
             model.squeeze.disable_update()
 
     # Set up a trainer
-    updater = Updater(train_iter, model, optimizer, args.mask, device=args.gpu)
+    updater = Updater(train_iter, model, teacher, optimizer, args.mask, device=args.gpu)
     trainer = training.Trainer(updater, (args.iteration, 'iteration'), args.out)
 
     val_interval = (10 if args.test else 1000), 'iteration'
     log_interval = (1 if args.test else 20), 'iteration'
 
     # trainer.extend(extensions.LinearShift('alpha', (1e-4, 5e-6), (1, 1000000)))
-    trainer.extend(Validator(val_iter, model, args.mask, device=args.gpu),
+    trainer.extend(Validator(val_iter, model, teacher, args.mask, device=args.gpu),
                    trigger=val_interval)
     # trainer.extend(Evaluator(coco_val, eval_iter, model, args.mask, device=args.gpu),
     #                trigger=val_interval)
@@ -357,7 +393,7 @@ if __name__ == '__main__':
     trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
-        'main/heat', 'val/heat', 'main/mask', 'val/mask', 'AP', 'AR'
+        'main/heat', 'val/heat',# 'main/mask', 'val/mask', 'AP', 'AR'
     ]), trigger=log_interval)
     trainer.extend(extensions.ProgressBar(update_interval=1))
 

@@ -20,6 +20,7 @@ def copy_vgg_params(model):
 class PoseNet(chainer.Chain):
     insize = 368
     downscale = 8
+    pad = downscale
 
     def __init__(self, joints=19, limbs=38, stuffs=2, stages=6, compute_mask=False):
         super(PoseNet, self).__init__()

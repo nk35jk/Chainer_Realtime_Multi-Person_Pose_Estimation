@@ -459,7 +459,7 @@ class PoseDetector(object):
         if self.arch in ['posenet']:
             x_data /= 255
             x_data -= 0.5
-        elif self.arch in ['nn1', 'resnetfpn']:
+        elif self.arch in ['nn1', 'resnetfpn', 'pspnet', 'student']:
             x_data -= np.array([104, 117, 123])
         x_data = x_data.transpose(2, 0, 1)[None]
         return x_data
@@ -480,7 +480,7 @@ class PoseDetector(object):
             multiplier = scale * params['inference_img_size'] / min(orig_img.shape[:2])
             img = cv2.resize(orig_img, (math.ceil(orig_img_w*multiplier), math.ceil(orig_img_h*multiplier)), interpolation=interpolation)
             bbox = (params['inference_img_size'], max(params['inference_img_size'], img.shape[1]))
-            padded_img, pad = self.pad_image(img, params['downscale'], (104, 117, 123))
+            padded_img, pad = self.pad_image(img, params['pad'], (104, 117, 123))
             #
             # print('')
             # print(img.shape)
@@ -525,6 +525,7 @@ class PoseDetector(object):
         # plt.imshow(orig_img[..., ::-1])
         # plt.imshow(heatmaps[2], alpha=.5, cmap='jet')
         # plt.show()
+        # import ipdb; ipdb.set_trace()
 
         # if self.device >= 0:
         #     pafs = cuda.to_gpu(pafs)
@@ -648,6 +649,9 @@ if __name__ == '__main__':
     parser.add_argument('--mask', action='store_true')
     parser.add_argument('--precise', action='store_true', help='visualize results')
     args = parser.parse_args()
+    params['inference_img_size'] = params['archs'][args.arch].insize
+    params['downscale'] = params['archs'][args.arch].downscale
+    params['pad'] = params['archs'][args.arch].pad
 
     chainer.config.enable_backprop = False
     chainer.config.train = False

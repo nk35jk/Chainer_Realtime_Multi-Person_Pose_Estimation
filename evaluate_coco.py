@@ -30,6 +30,7 @@ def parse_args():
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
+    params['pad'] = params['archs'][args.arch].pad
     return args
 
 
@@ -47,7 +48,7 @@ def evaluate():
     for i in range(100):
     # for i in [1]:
         img, annotations, img_id = eval_loader.get_example(i)
-        print(i, img_id)
+        print('{:4d}, img id = {}'.format(i, img_id))
 
         imgIds.append(img_id)
 

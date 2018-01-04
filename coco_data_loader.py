@@ -335,12 +335,6 @@ class CocoDataLoader(DatasetMixin):
             else:
                 masks[mask == 1] = 2
 
-        # stuff_path = os.path.join(params['coco_stuff_dir'], 'annotations/COCO_train2014_{:012d}.mat'.format(img_id))
-        # if os.path.exists(stuff_path):
-        #     stuff_mask = loadmat(stuff_path)['S']
-        # else:
-        #     stuff_mask = np.zeros(ignore_mask.shape, 'uint8')
-
         if self.mode == 'eval':
             return img, img_id, annotations_for_img, ignore_mask, masks
         return img, img_id, annotations, ignore_mask, masks

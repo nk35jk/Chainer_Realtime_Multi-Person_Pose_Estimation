@@ -5,6 +5,8 @@ from models.CocoPoseNet import CocoPoseNet
 from models.posenet import PoseNet
 from models.nn1 import NN1
 from models.resnetfpn import ResNetFPN
+from models.pspnet import PSPNet
+from models.student import Student
 
 from models.FaceNet import FaceNet
 from models.HandNet import HandNet
@@ -59,6 +61,8 @@ params = {
         'handnet': HandNet,
         'nn1': NN1,
         'resnetfpn': ResNetFPN,
+        'pspnet': PSPNet,
+        'student': Student,
     },
     # training params
     'insize': 368,
@@ -185,8 +189,10 @@ def parse_args():
                         help='Output directory')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--mask', action='store_true')
+    parser.add_argument('--distill', action='store_true')
     parser.set_defaults(test=False)
     parser.set_defaults(mask=False)
+    parser.set_defaults(distill=False)
     args = parser.parse_args()
     params['insize'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
