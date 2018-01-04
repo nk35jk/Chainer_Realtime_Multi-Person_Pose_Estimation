@@ -144,9 +144,6 @@ class Updater(StandardUpdater):
             elif args.arch in ['nn1', 'student']:
                 model.squeeze.enable_update()
 
-        if 100000 <= self.iteration < 200000:
-            optimizer.alpha = 1e-5
-
         batch = train_iter.next()
 
         imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
