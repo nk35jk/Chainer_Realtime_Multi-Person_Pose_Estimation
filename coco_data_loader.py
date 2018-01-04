@@ -367,7 +367,7 @@ class CocoDataLoader(DatasetMixin):
     def generate_labels(self, img, poses, ignore_mask, stuff_mask):
         stuff_mask = stuff_mask.astype('i') - 1
         img, ignore_mask, poses, stuff_mask = self.augment_data(img, ignore_mask, poses, stuff_mask)
-        resized_img, ignore_mask, resized_poses, resized_stuff = self.resize_data(img, ignore_mask, poses, stuff_mask, shape=(params['insize'], params['insize']))
+        resized_img, ignore_mask, resized_poses, resized_stuff = self.resize_data(img, ignore_mask, poses, stuff_mask, shape=(self.insize, self.insize))
 
         heatmaps = self.generate_heatmaps(resized_img, resized_poses, params['heatmap_sigma'])
         pafs = self.generate_pafs(resized_img, resized_poses, params['paf_sigma'])
