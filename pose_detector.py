@@ -403,14 +403,14 @@ class PoseDetector(object):
                 continue
 
             # initialize first body part connection 15&16
-            if k == 1:
+            if k == 0:
                 subset = np.zeros((len(temp), kpt_num))
                 for i in range(len(temp)):
                     subset[i, limbSeq[0]] = temp[i, 0:2]
                     subset[i, -1] = 2
                     # add the score of parts and the connection
                     subset[i, -2] = sum(candidates[temp[i, :2].astype('i'), 2]) + temp[i, 2]
-            elif k == 18 or k == 19:
+            elif k == 17 or k == 18:
                 # add 15 16 connection
                 partA = temp[:, 0]
                 partB = temp[:, 1]
