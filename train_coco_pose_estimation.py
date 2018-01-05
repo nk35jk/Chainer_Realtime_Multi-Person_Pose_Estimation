@@ -252,13 +252,13 @@ class Evaluator(extensions.Evaluator):
             img, annotation, img_id = batch[0]
             with function.no_backprop_mode():
                 imgIds.append(img_id)
-                poses = self.pose_detector(img)
+                poses, scores = self.pose_detector(img)
 
-                for pose in poses:
+                for pose, score in zip(poses, scores):
                     res_dict = {}
                     res_dict['category_id'] = 1
                     res_dict['image_id'] = img_id
-                    res_dict['score'] = 1
+                    res_dict['score'] = score
 
                     keypoints = np.zeros((len(params['coco_joint_indices']), 3))
                     for joint, jt in zip(pose, JointType):

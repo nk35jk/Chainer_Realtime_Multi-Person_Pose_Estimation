@@ -55,14 +55,14 @@ class Objective(object):
             imgIds.append(img_id)
 
             st = time.time()
-            poses = self.pose_detector(img)
+            poses, scores = self.pose_detector(img)
             print('inference: {:.2f}s'.format(time.time() - st))
 
-            for pose in poses:
+            for pose, score in zip(poses, scores):
                 res_dict = {}
                 res_dict['category_id'] = 1
                 res_dict['image_id'] = img_id
-                res_dict['score'] = 1
+                res_dict['score'] = score
 
                 keypoints = np.zeros((len(params['coco_joint_indices']), 3))
                 for joint, jt in zip(pose, JointType):

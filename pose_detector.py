@@ -714,6 +714,7 @@ class PoseDetector(object):
         subsets_ = self.grouping_key_points(all_connections, all_peaks, params)
         subsets = self.compute_subsets(pafs, all_peaks, orig_img_h, params)
         poses = self.subsets_to_pose_array(subsets, all_peaks)
+        scores = subsets[:, -2]
 
         # ### for debug
         # print('Number of candidate peaks: {}'.format(len(all_peaks)))
@@ -726,7 +727,7 @@ class PoseDetector(object):
         #     cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
         # cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
         # ###
-        return poses
+        return poses, scores
 
     def __call__(self, orig_img):
         orig_img = orig_img.copy()
@@ -777,7 +778,8 @@ class PoseDetector(object):
         all_peaks[:, 1] *= orig_img_w / resized_output_img_w
         all_peaks[:, 2] *= orig_img_h / resized_output_img_h
         poses = self.subsets_to_pose_array(subsets, all_peaks)
-        return poses
+        scores = subsets[:, -2]
+        return poses, scores
 
 
 def draw_person_pose(orig_img, poses):
@@ -841,7 +843,7 @@ if __name__ == '__main__':
 
         # inference
         st = time.time()
-        poses = pose_detector(img)
+        poses, _ = pose_detector(img)
         print('inference time: {:.2f}s, {} persons are detected.'.format(time.time() - st, len(poses)))
 
         # draw and save image
