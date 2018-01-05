@@ -450,7 +450,7 @@ class PoseDetector(object):
 
         # delete low score subsets
         keep = np.logical_and(subset[:, -1] >= params['n_subset_limbs_thresh'], subset[:, -2]/subset[:, -1] >= params['subset_score_thresh'])
-        subsets = subset[keep]
+        subset = subset[keep]
 
         return subset
 
