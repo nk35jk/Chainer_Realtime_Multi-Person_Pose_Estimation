@@ -282,29 +282,29 @@ class PoseDetector(object):
 
     def compute_candidate_connections2(self, paf, cand_a, cand_b, img_len, params):
 
-            candidate_connections = []
-            for i, joint_a in enumerate(cand_a):
-                for j, joint_b in enumerate(cand_b):  # jointは(x, y)座標
-                    vector = joint_b[:2] - joint_a[:2]
-                    norm = xp.linalg.norm(vector)
-                    if norm == 0:
-                        continue
+        candidate_connections = []
+        for i, joint_a in enumerate(cand_a):
+            for j, joint_b in enumerate(cand_b):  # jointは(x, y)座標
+                vector = joint_b[:2] - joint_a[:2]
+                norm = xp.linalg.norm(vector)
+                if norm == 0:
+                    continue
 
-                    ys = xp.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
-                    xs = xp.linspace(joint_a[0], joint_b[0], num=params['n_integ_points'])
-                    integ_points = xp.stack([ys, xs]).T.round().astype('i')  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
-                    paf_in_edge = xp.hstack([paf[0][xp.hsplit(integ_points, 2)], paf[1][xp.hsplit(integ_points, 2)]])
-                    unit_vector = vector / norm
-                    inner_products = xp.dot(paf_in_edge, unit_vector)
+                ys = xp.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
+                xs = xp.linspace(joint_a[0], joint_b[0], num=params['n_integ_points'])
+                integ_points = xp.stack([ys, xs]).T.round().astype('i')  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
+                paf_in_edge = xp.hstack([paf[0][xp.hsplit(integ_points, 2)], paf[1][xp.hsplit(integ_points, 2)]])
+                unit_vector = vector / norm
+                inner_products = xp.dot(paf_in_edge, unit_vector)
 
-                    integ_value = inner_products.sum() / len(inner_products)
-                    # vectorの長さが基準値以上の時にペナルティを与える
-                    integ_value_with_dist_prior = integ_value + min(params['limb_length_ratio'] * img_len / norm - params['length_penalty_value'], 0)
+                integ_value = inner_products.sum() / len(inner_products)
+                # vectorの長さが基準値以上の時にペナルティを与える
+                integ_value_with_dist_prior = integ_value + min(params['limb_length_ratio'] * img_len / norm - params['length_penalty_value'], 0)
 
-                    n_valid_points = sum(inner_products > params['inner_product_thresh'])
-                    if n_valid_points > params['n_integ_points_thresh'] and integ_value_with_dist_prior > 0:
-                        candidate_connections.append([i, j, integ_value_with_dist_prior])
-            candidate_connections = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
+                n_valid_points = sum(inner_products > params['inner_product_thresh'])
+                if n_valid_points > params['n_integ_points_thresh'] and integ_value_with_dist_prior > 0:
+                    candidate_connections.append([i, j, integ_value_with_dist_prior])
+        candidate_connections = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
 
         return candidate_connections
 
