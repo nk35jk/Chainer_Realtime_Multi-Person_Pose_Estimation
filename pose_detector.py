@@ -286,16 +286,16 @@ class PoseDetector(object):
         for i, joint_a in enumerate(cand_a):
             for j, joint_b in enumerate(cand_b):  # jointは(x, y)座標
                 vector = joint_b[:2] - joint_a[:2]
-                norm = xp.linalg.norm(vector)
+                norm = np.linalg.norm(vector)
                 if norm == 0:
                     continue
 
-                ys = xp.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
-                xs = xp.linspace(joint_a[0], joint_b[0], num=params['n_integ_points'])
-                integ_points = xp.stack([ys, xs]).T.round().astype('i')  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
-                paf_in_edge = xp.hstack([paf[0][xp.hsplit(integ_points, 2)], paf[1][xp.hsplit(integ_points, 2)]])
+                ys = np.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
+                xs = np.linspace(joint_a[0], joint_b[0], num=params['n_integ_points'])
+                integ_points = np.stack([ys, xs]).T.round().astype('i')  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
+                paf_in_edge = np.hstack([paf[0][np.hsplit(integ_points, 2)], paf[1][np.hsplit(integ_points, 2)]])
                 unit_vector = vector / norm
-                inner_products = xp.dot(paf_in_edge, unit_vector)
+                inner_products = np.dot(paf_in_edge, unit_vector)
 
                 integ_value = inner_products.sum() / len(inner_products)
                 # vectorの長さが基準値以上の時にペナルティを与える
@@ -441,6 +441,7 @@ class PoseDetector(object):
                     # if find no partA in the subset, create a new subset
                     if num == 0:
                         subset.append([0] * kpt_num)
+                        import ipdb; ipdb.set_trace()
                         subset[-1, indexA] = partA[i]
                         subset[-1, indexB] = partB[i]
                         subset[-1, -1] = 2
