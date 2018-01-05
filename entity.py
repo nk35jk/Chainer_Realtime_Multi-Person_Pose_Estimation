@@ -93,8 +93,8 @@ params = {
     'inner_product_thresh': 0.05,  # 005, 0.0037
     'limb_length_ratio': 0.5,  # 0.5, 0.87
     'length_penalty_value': 1,
-    'n_subset_limbs_thresh': 7,  # 7, 6
-    'subset_score_thresh': 0.4,  # 0.4, 0.55
+    'n_subset_limbs_thresh': 3,  # 7, 6
+    'subset_score_thresh': 0.2,  # 0.4, 0.55
     'limbs_point': [
         [JointType.Neck, JointType.RightWaist],
         [JointType.RightWaist, JointType.RightKnee],
