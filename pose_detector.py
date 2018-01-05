@@ -280,6 +280,150 @@ class PoseDetector(object):
         subsets = subsets[keep]
         return subsets
 
+    def compute_subsets(self, pafs, all_peaks, orig_img_h, params):
+        candidates = all_peaks[:, 1:]
+
+        kpt_num = 18 + 2
+
+        limbSeq = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10],
+                   [10,11], [2,12], [12,13], [13,14], [2,1], [1,15], [15,17],
+                   [1,16], [16,18], [3,17], [6,18]]
+        limbSeq = np.array(limbSeq) - 1
+
+        mapIdx = [[31,32], [39,40], [33,34], [35,36], [41,42], [43,44], [19,20], [21,22],
+                  [23,24], [25,26], [27,28], [29,30], [47,48], [49,50], [53,54], [51,52],
+                  [55,56], [37,38], [45,46]]
+
+        subset = []
+
+        for k in range(len(mapIdx)):
+            score_mid = pafs[[x - 19 for x in mapIdx[k]]]
+
+            candA = all_peaks[all_peaks[:, 0] == limbSeq[k][0]][:, 1:]
+            candB = all_peaks[all_peaks[:, 0] == limbSeq[k][1]][:, 1:]
+
+            connection = []
+
+            nA = len(candA)
+            nB = len(candB)
+            indexA = limbSeq[k][0]
+            indexB = limbSeq[k][1]
+
+            if nA == 0 and nB == 0:
+                continue
+            elif nA == 0:
+                for i in range(nB):
+                    num = 0
+                    for j in range(len(subset)):
+                        if subset[j, indexB] == candB[i, 3]:
+                            num += 1
+                            continue
+
+                    # if find no partB in the subset, create a new subset
+                    if num == 0:
+                        subset.append([0] * kpt_num)
+                        subset[-1][indexB] = candB[i, 3]
+                        subset[-1][-1] = 1
+                        subset[-1][-2] = candB[i, 2]
+                continue
+            elif nB == 0:
+                for i in range(nA):
+                    num = 0
+                    for j in range(len(subset)):
+                        if subset[j, indexA] == candA[i, 3]:
+                            num += 1
+                            continue
+
+                    # if find no partA in the subset, create a new subset
+                    if num == 0:
+                        subset.append([0] * kpt_num)
+                        subset[-1][indexA] = candA[i, 3]
+                        subset[-1][-1] = 1
+                        subset[-1][-2] = candA[i, 2]
+                continue
+
+            temp = self.compute_candidate_connections(score_mid, candA, candB, orig_img_h/2, params)
+
+            # select the top num connection, assuming that each part occur only once
+            # sort rows in descending order
+            if len(temp) > 0:
+                temp = sorted(temp, key=lambda x:x[2], reverse=True)
+            # set the conection number as the smaller parts set number
+            num = min(nA, nB)
+            cnt = 0
+            occurA = [0] * nA
+            occurB = [0] * nB
+
+            for row in range(len(temp)):
+                if cnt == num:
+                    break
+                else:
+                    i = temp[row, 0]
+                    j = temp[row, 1]
+                    score = temp[row, 2]
+                    if occurA[i] == 0 and occurB[j] == 0:
+                        connection.append([candA[i, 3], candB[j, 3], score])
+                        cnt += 1
+                        occurA[i] = 1
+                        occurB[j] = 1
+
+            # cluster all the joints candidates into subset based on the part connection
+            temp = connection
+            if len(temp) == 0:
+                continue
+
+            # initialize first body part connection 15&16
+            if k == 1:
+                subset = np.zeros((len(temp), kpt_num))
+                for i in range(len(temp)):
+                    subset[i, limbSeq[0]] = temp[i, 0:2]
+                    subset[i, -1] = 2
+                    # add the score of parts and the connection
+                    subset[i, -2] = sum(candidates[temp[i, :2], 2]) + temp[i, 2]
+            elif k == 18 or k == 19:
+                # add 15 16 connection
+                partA = temp[:, 0]
+                partB = temp[:, 1]
+                indexA = limbSeq[k, 0]
+                indexB = limbSeq[k, 1]
+
+                for i in range(len(temp)):
+                    for j in range(len(subset)):
+                        if subset[j, indexA] == partA[i] and subset[j, indexB] == 0:
+                            subset[j, indexB] = partB[i]
+                        elif subset[j, indexB] == partB[i] and subset[j, indexA] == 0:
+                            subset[j, indexA] = partA[i]
+                continue
+            else:
+                # partA is already in the subset, find its connection partB
+                partA = temp[:, 0]
+                partB = temp[:, 1]
+                indexA = limbSeq[k, 0]
+                indexB = limbSeq[k, 1]
+
+                for i in range(len(temp)):
+                    num = 0
+                    for j in range(len(subset)):
+                        if subset[j, indexA] == partA[i]:
+                            subset[j, indexB] = partB[i]
+                            num += 1
+                            subset[j, -1] = subset[j, -1] + 1
+                            subset[j, -2] = subset[j, -2] + candidates[partB[i], 2] + temp[i, 2]
+
+                    # if find no partA in the subset, create a new subset
+                    if num == 0:
+                        subset.append([0] * kpt_num)
+                        subset[-1, indexA] = partA[i]
+                        subset[-1, indexB] = partB[i]
+                        subset[-1, -1] = 2
+                        subset[-1, -2] = sum(candidates[temp[i, :2], 2]) + temp[i, 2]
+
+        # delete low score subsets
+        keep = np.logical_and(subset[:, -1] >= params['n_subset_limbs_thresh'], subset[:, -2]/subset[:, -1] >= params['subset_score_thresh'])
+        subsets = subset[keep]
+
+        return subset
+
     def subsets_to_pose_array(self, subsets, all_peaks):
         person_pose_array = []
         for subset in subsets:
@@ -538,6 +682,7 @@ class PoseDetector(object):
             return np.empty((0, len(JointType), 3))
         all_connections = self.compute_connections(pafs, all_peaks, orig_img_w, params)
         subsets = self.grouping_key_points(all_connections, all_peaks, params)
+        subsets = self.compute_subsets(pafs, all_peaks, orig_img_h, params)
         poses = self.subsets_to_pose_array(subsets, all_peaks)
 
         # ### for debug
@@ -551,6 +696,7 @@ class PoseDetector(object):
         #     cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
         # cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
         # ###
+        import ipdb; ipdb.set_trace()
         return poses
 
     def __call__(self, orig_img):
