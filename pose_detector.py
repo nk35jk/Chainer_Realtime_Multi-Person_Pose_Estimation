@@ -323,6 +323,7 @@ class PoseDetector(object):
                   [55,56], [37,38], [45,46]]
 
         subset = np.zeros((0, kpt_num))
+        subset[:, :-2] = 0
 
         for k in range(len(mapIdx)):
             score_mid = pafs[[x - 19 for x in mapIdx[k]]]
@@ -438,7 +439,7 @@ class PoseDetector(object):
                             subset[j, indexB] = partB[i]
                             num += 1
                             subset[j, -1] = subset[j, -1] + 1
-                            subset[j, -2] = subset[j, -2] + candidates[partB[i], 2] + temp[i, 2]
+                            subset[j, -2] = subset[j, -2] + candidates[int(partB[i]), 2] + temp[i, 2]
 
                     # if find no partA in the subset, create a new subset
                     if num == 0:
@@ -726,7 +727,6 @@ class PoseDetector(object):
         #     cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
         # cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
         # ###
-        import ipdb; ipdb.set_trace()
         return poses
 
     def __call__(self, orig_img):
