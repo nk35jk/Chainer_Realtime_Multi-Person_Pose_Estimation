@@ -177,7 +177,7 @@ def parse_args():
                         help='Number of validation samples')
     parser.add_argument('--eval_samples', type=int, default=100,
                         help='Number of validation samples')
-    parser.add_argument('--iteration', '-i', type=int, default=600000,
+    parser.add_argument('--iteration', '-i', type=int, default=300000,
                         help='Number of iterations to train')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
