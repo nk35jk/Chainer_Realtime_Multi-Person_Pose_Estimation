@@ -258,7 +258,7 @@ class Evaluator(extensions.Evaluator):
                     res_dict = {}
                     res_dict['category_id'] = 1
                     res_dict['image_id'] = img_id
-                    res_dict['score'] = score
+                    res_dict['score'] = score * sum(pose[:, 2] > 0)
 
                     keypoints = np.zeros((len(params['coco_joint_indices']), 3))
                     for joint, jt in zip(pose, JointType):
