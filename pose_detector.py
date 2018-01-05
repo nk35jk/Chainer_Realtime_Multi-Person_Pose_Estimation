@@ -409,7 +409,7 @@ class PoseDetector(object):
                     subset[i, limbSeq[0]] = temp[i, 0:2]
                     subset[i, -1] = 2
                     # add the score of parts and the connection
-                    subset[i, -2] = sum(candidates[temp[i, :2], 2]) + temp[i, 2]
+                    subset[i, -2] = sum(candidates[temp[i, :2].astype('i'), 2]) + temp[i, 2]
             elif k == 18 or k == 19:
                 # add 15 16 connection
                 partA = temp[:, 0]
@@ -446,7 +446,7 @@ class PoseDetector(object):
                         subset[-1, indexA] = partA[i]
                         subset[-1, indexB] = partB[i]
                         subset[-1, -1] = 2
-                        subset[-1, -2] = sum(candidates[temp[i, :2], 2]) + temp[i, 2]
+                        subset[-1, -2] = sum(candidates[temp[i, :2].astype('i'), 2]) + temp[i, 2]
 
         # delete low score subsets
         keep = np.logical_and(subset[:, -1] >= params['n_subset_limbs_thresh'], subset[:, -2]/subset[:, -1] >= params['subset_score_thresh'])
@@ -711,7 +711,7 @@ class PoseDetector(object):
         if len(all_peaks) == 0:
             return np.empty((0, len(JointType), 3))
         all_connections = self.compute_connections(pafs, all_peaks, orig_img_w, params)
-        subsets = self.grouping_key_points(all_connections, all_peaks, params)
+        subsets_ = self.grouping_key_points(all_connections, all_peaks, params)
         subsets = self.compute_subsets(pafs, all_peaks, orig_img_h, params)
         poses = self.subsets_to_pose_array(subsets, all_peaks)
 
