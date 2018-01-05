@@ -3,10 +3,11 @@ import numpy as np
 import chainer
 from chainer import functions as F, links as L
 from chainer import initializers
+from chainer.links import caffe
 
 
 class BottleNeckA(chainer.Chain):
-    def __init__(self, in_size, ch, out_size, stride=2):
+    def __init__(self, in_size, ch, out_size, stride=1, dilation=1):
         super(BottleNeckA, self).__init__()
         initialW = initializers.HeNormal()
 
@@ -14,8 +15,12 @@ class BottleNeckA(chainer.Chain):
             self.conv1 = L.Convolution2D(
                 in_size, ch, 1, stride, 0, initialW=initialW, nobias=True)
             self.bn1 = L.BatchNormalization(ch)
-            self.conv2 = L.Convolution2D(
-                ch, ch, 3, 1, 1, initialW=initialW, nobias=True)
+            if dilation == 1:
+                self.conv2 = L.Convolution2D(
+                    ch, ch, 3, 1, 1, initialW=initialW, nobias=True)
+            else:
+                self.conv2 = L.DilatedConvolution2D(ch, ch, 3, 1, pad=dilation,
+                    dilate=dilation, initialW=initialW, nobias=True)
             self.bn2 = L.BatchNormalization(ch)
             self.conv3 = L.Convolution2D(
                 ch, out_size, 1, 1, 0, initialW=initialW, nobias=True)
@@ -35,7 +40,7 @@ class BottleNeckA(chainer.Chain):
 
 
 class BottleNeckB(chainer.Chain):
-    def __init__(self, in_size, ch):
+    def __init__(self, in_size, ch, dilation=1):
         super(BottleNeckB, self).__init__()
         initialW = initializers.HeNormal()
 
@@ -43,8 +48,12 @@ class BottleNeckB(chainer.Chain):
             self.conv1 = L.Convolution2D(
                 in_size, ch, 1, 1, 0, initialW=initialW, nobias=True)
             self.bn1 = L.BatchNormalization(ch)
-            self.conv2 = L.Convolution2D(
-                ch, ch, 3, 1, 1, initialW=initialW, nobias=True)
+            if dilation == 1:
+                self.conv2 = L.Convolution2D(
+                    ch, ch, 3, 1, 1, initialW=initialW, nobias=True)
+            else:
+                self.conv2 = L.DilatedConvolution2D(ch, ch, 3, 1, pad=dilation,
+                    dilate=dilation, initialW=initialW, nobias=True)
             self.bn2 = L.BatchNormalization(ch)
             self.conv3 = L.Convolution2D(
                 ch, in_size, 1, 1, 0, initialW=initialW, nobias=True)
@@ -58,11 +67,11 @@ class BottleNeckB(chainer.Chain):
 
 
 class Block(chainer.Chain):
-    def __init__(self, layer, in_size, ch, out_size, stride=2):
+    def __init__(self, layer, in_size, ch, out_size, stride=2, dilation=1):
         super(Block, self).__init__()
-        self.add_link('a', BottleNeckA(in_size, ch, out_size, stride))
+        self.add_link('a', BottleNeckA(in_size, ch, out_size, stride, dilation))
         for i in range(1, layer):
-            self.add_link('b{}'.format(i), BottleNeckB(out_size, ch))
+            self.add_link('b{}'.format(i), BottleNeckB(out_size, ch, dilation))
         self.layer = layer
 
     def __call__(self, x):
@@ -75,14 +84,14 @@ class Block(chainer.Chain):
 class ResNet(chainer.Chain):
     def __init__(self):
         super(ResNet, self).__init__()
+        initialW = initializers.HeNormal()
         with self.init_scope():
             self.conv1 = L.Convolution2D(
                 3, 64, 7, 2, 3, initialW=initializers.HeNormal(), nobias=True)
             self.bn1 = L.BatchNormalization(64)
-            self.res2 = Block(3, 64, 64, 256, 1)
-            self.res3 = Block(4, 256, 128, 512)
-            self.res4 = Block(6, 512, 256, 1024)
-            self.res5 = Block(3, 1024, 512, 2048)
+
+            self.res2 = Block(3, 64, 64, 256, stride=1)
+            self.res3 = Block(4, 256, 128, 512, stride=2)
 
     def __call__(self, x):
         hs = []
@@ -92,19 +101,14 @@ class ResNet(chainer.Chain):
         hs.append(h)
         h = self.res3(h)
         hs.append(h)
-        h = self.res4(h)
-        hs.append(h)
-        h = self.res5(h)
-        hs.append(h)
         return hs
 
 
 class PSPNet(chainer.Chain):
-    """Network like PSPNet"""
+    """Network like Pyramid Scene Pursing Network"""
 
-    insize = 384
-    downscale = 4
-    pad = 32
+    insize = 480
+    downscale = pad = 8
 
     def __init__(self, joints=19, limbs=38, compute_mask=False):
         super(PSPNet, self).__init__()
@@ -112,42 +116,34 @@ class PSPNet(chainer.Chain):
         self.limbs = limbs
         with self.init_scope():
             self.res = ResNet()
-            self.C2lateral = L.Convolution2D(256, 128, 1, stride=1, pad=0, nobias=True)
-            self.C3lateral = L.Convolution2D(512, 256, 1, stride=1, pad=0, nobias=True)
-            self.C4lateral = L.Convolution2D(1024, 512, 1, stride=1, pad=0, nobias=True)
-            self.C5lateral = L.Convolution2D(2048, 1024, 1, stride=1, pad=0, nobias=True)
 
-            self.conv1 = L.Convolution2D(1920, 512, 1, stride=1, pad=0, nobias=True)
-            self.bn1 = L.BatchNormalization(512)
-            self.conv2 = L.Convolution2D(512, 512, 3, stride=1, pad=1, nobias=True)
-            self.bn2 = L.BatchNormalization(512)
-            self.conv3 = L.Convolution2D(512, limbs+joints, 1, stride=1, pad=0)
+            self.res4 = Block(6, 512, 256, 1024, stride=1, dilation=2)
+            self.res5 = Block(3, 1024, 512, 2048, stride=1, dilation=4)
+
+            self.conv5_3 = L.Convolution2D(2048, 512, 1, nobias=True)
+            self.bn5_3 = L.BatchNormalization(512)
+
+            self.conv5_4 = L.Convolution2D(2560, 512, 1, nobias=True)
+            self.bn5_4 = L.BatchNormalization(512)
+            self.conv6 = L.Convolution2D(512, limbs+joints, 1)
 
     def __call__(self, x):
         pafs, heatmaps = [], []
 
-        c2, c3, c4, c5 = self.res(x)
+        c2, c3 = self.res(x)
 
-        c2l = self.C2lateral(c2)
-        c3l = self.C3lateral(c3)
-        c4l = self.C4lateral(c4)
-        c5l = self.C5lateral(c5)
+        c4 = self.res4(c3)
+        c5 = self.res5(c4)
 
-        if PSPNet.downscale == 4:
-            shape = c2l.shape[2:]
-        elif PSPNet.downscale == 8:
-            shape = c3l.shape[2:]
+        shape = c5.shape[2:]
+        pool1 = F.average_pooling_2d(c5, ksize=shape)
+        pool1 = F.relu(self.bn5_3(self.conv5_3(pool1)))
+        pool1 = F.resize_images(pool1, shape)
 
-        p2 = F.resize_images(c2l, shape)
-        p3 = F.resize_images(c3l, shape)
-        p4 = F.resize_images(c4l, shape)
-        p5 = F.resize_images(c5l, shape)
+        h = F.concat([c5, pool1])
 
-        h = F.concat([p2, p3, p4, p5])
-
-        h = F.relu(self.bn1(self.conv1(h)))
-        h = F.relu(self.bn2(self.conv2(h)))
-        h = self.conv3(h)
+        h = F.relu(self.bn5_4(self.conv5_4(h)))
+        h = self.conv6(h)
 
         pafs.append(h[:, :self.limbs])
         heatmaps.append(h[:, -self.joints:])
@@ -157,7 +153,7 @@ class PSPNet(chainer.Chain):
 
 if __name__ == '__main__':
     model = PSPNet()
-    arr = np.random.rand(1, 3, 384, 384).astype('f')
+    arr = np.random.rand(1, 3, model.insize, model.insize).astype('f')
     h1s, h2s = model(arr)
 
     import chainer.computational_graph as c
