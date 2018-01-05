@@ -33,6 +33,7 @@ def parse_args():
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
+    params['pad'] = params['archs'][args.arch].pad
     return args
 
 
