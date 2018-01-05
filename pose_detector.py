@@ -322,7 +322,7 @@ class PoseDetector(object):
                   [23,24], [25,26], [27,28], [29,30], [47,48], [49,50], [53,54], [51,52],
                   [55,56], [37,38], [45,46]]
 
-        subset = []
+        subset = np.zeros((0, kpt_num))
 
         for k in range(len(mapIdx)):
             score_mid = pafs[[x - 19 for x in mapIdx[k]]]
@@ -349,7 +349,8 @@ class PoseDetector(object):
 
                     # if find no partB in the subset, create a new subset
                     if num == 0:
-                        subset.append([0] * kpt_num)
+                        # subset.append([0] * kpt_num)
+                        subset = np.vstack([subset, np.zeros(kpt_num)])
                         subset[-1][indexB] = candB[i, 3]
                         subset[-1][-1] = 1
                         subset[-1][-2] = candB[i, 2]
@@ -364,7 +365,8 @@ class PoseDetector(object):
 
                     # if find no partA in the subset, create a new subset
                     if num == 0:
-                        subset.append([0] * kpt_num)
+                        # subset.append([0] * kpt_num)
+                        subset = np.vstack([subset, np.zeros(kpt_num)])
                         subset[-1][indexA] = candA[i, 3]
                         subset[-1][-1] = 1
                         subset[-1][-2] = candA[i, 2]
@@ -440,8 +442,7 @@ class PoseDetector(object):
 
                     # if find no partA in the subset, create a new subset
                     if num == 0:
-                        subset.append([0] * kpt_num)
-                        import ipdb; ipdb.set_trace()
+                        subset = np.vstack([subset, np.zeros(kpt_num)])
                         subset[-1, indexA] = partA[i]
                         subset[-1, indexB] = partB[i]
                         subset[-1, -1] = 2
