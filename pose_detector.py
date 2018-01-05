@@ -358,9 +358,10 @@ class PoseDetector(object):
                 if cnt == num:
                     break
                 else:
-                    i = temp[row, 0]
-                    j = temp[row, 1]
-                    score = temp[row, 2]
+                    i = temp[row][0]
+                    j = temp[row][1]
+                    score = temp[row][2]
+                    import ipdb; ipdb.set_trace()
                     if occurA[i] == 0 and occurB[j] == 0:
                         connection.append([candA[i, 3], candB[j, 3], score])
                         cnt += 1
@@ -368,7 +369,7 @@ class PoseDetector(object):
                         occurB[j] = 1
 
             # cluster all the joints candidates into subset based on the part connection
-            temp = connection
+            temp = np.array(connection)
             if len(temp) == 0:
                 continue
 
