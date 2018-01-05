@@ -40,7 +40,8 @@ class Objective(object):
 
     def __init__(self):
         self.coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-        self.eval_loader = CocoDataLoader(self.coco_val, mode='eval', n_samples=None)
+        self.eval_loader = CocoDataLoader(self.coco_val, params['inference_img_size'], mode='eval', n_samples=None)
+        import ipdb; ipdb.set_trace()
         self.pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask)
 
     def __call__(self, p):
@@ -49,7 +50,7 @@ class Objective(object):
 
         res = []
         imgIds = []
-        for i in range(100):
+        for i in range(2000, 2100):
             img, annotations, img_id = self.eval_loader.get_example(i)
 
             imgIds.append(img_id)
