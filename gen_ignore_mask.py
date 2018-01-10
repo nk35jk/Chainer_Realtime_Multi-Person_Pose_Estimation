@@ -29,7 +29,7 @@ class CocoDataLoader(object):
                 intxn = mask_all & mask
                 mask_miss = mask_miss | (mask - intxn)
                 mask_all = mask_all | mask
-            elif ann['num_keypoints'] < 5 or ann['area'] <= 32 * 32:
+            elif ann['num_keypoints'] < params['min_keypoints'] or ann['area'] <= params['min_area']:
                 mask_all = mask_all | mask
                 mask_miss = mask_miss | mask
             else:

@@ -307,7 +307,7 @@ class CocoDataLoader(DatasetMixin):
             valid_annotations_for_img = []
             for annotation in annotations_for_img:
                 # if too few keypoints or too small
-                if annotation['num_keypoints'] >= 5 and annotation['area'] > 32 * 32:
+                if annotation['num_keypoints'] >= params['min_keypoints'] and annotation['area'] > params['min_area']:
                     person_cnt += 1
                     valid_annotations_for_img.append(annotation)
 

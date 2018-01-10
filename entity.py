@@ -67,6 +67,8 @@ params = {
         'cpn': CPN,
     },
     # training params
+    'min_keypoints': 5,
+    'min_area': 32 * 32,
     'insize': 368,
     'downscale': 8,
     'paf_sigma': 8,
