@@ -87,14 +87,14 @@ params = {
     'heatmap_size': 320,
     'gaussian_sigma': 2.5,
     'ksize': 17,
-    'n_integ_points': 14,  # 10, 13
-    'n_integ_points_thresh': 5,  # 8, 5
-    'heatmap_peak_thresh': 0.0238,  # 0.1, 0.038
-    'inner_product_thresh': 0.0067,  # 0.05, 0.0037
-    'limb_length_ratio': 0.89,  # 0.5, 0.87
+    'n_integ_points': 14,  # 10, 14
+    'n_integ_points_thresh': 4,  # 8, 4
+    'heatmap_peak_thresh': 0.0254,  # 0.1, 0.0254
+    'inner_product_thresh': 0.021,  # 0.05, 0.0210
+    'limb_length_ratio': 0.817,  # 0.5, 0.817
     'length_penalty_value': 1,
-    'n_subset_limbs_thresh': 5,  # 7, 6
-    'subset_score_thresh': 0.136,  # 0.4, 0.55
+    'n_subset_limbs_thresh': 3,  # 7, 3
+    'subset_score_thresh': 0.14,  # 0.4, 0.140
     'limbs_point': [
         [JointType.Neck, JointType.RightWaist],
         [JointType.RightWaist, JointType.RightKnee],

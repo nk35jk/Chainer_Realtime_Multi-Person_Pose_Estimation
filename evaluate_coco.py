@@ -78,8 +78,8 @@ def evaluate():
             #     for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):
             #         cv2.circle(img, tuple(joint.tolist()), 3, (0, 0, 255), -1)
 
-            # cv2.imshow('results', img)
-            # cv2.waitKey(1)
+            cv2.imshow('results', img)
+            cv2.waitKey(1)
 
         # # GT (test)
         # for ann in annotations:
