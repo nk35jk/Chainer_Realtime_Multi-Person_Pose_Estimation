@@ -237,7 +237,7 @@ class PoseDetector(object):
                         found_subset[-2] += candidate_peaks[ind_b, 3] + score  # joint bのscoreとconnectionの積分値を加算
 
                 elif joint_found_cnt == 2: # subset1にjoint1が、subset2にjoint2がある場合(肩->耳のconnectionの組合せした起こり得ない)
-                    print('limb {}: 2 subsets have any joint'.format(l))
+                    # print('limb {}: 2 subsets have any joint'.format(l))
                     found_subset_1 = subsets[joint_found_subset_index[0]]
                     found_subset_2 = subsets[joint_found_subset_index[1]]
 
@@ -273,7 +273,8 @@ class PoseDetector(object):
                     row[-2] = sum(candidate_peaks[[ind_a, ind_b], 3]) + score
                     subsets = np.vstack([subsets, row])
                 elif joint_found_cnt >= 3:
-                    print('more than 3 subsets have any joint')
+                    # print('more than 3 subsets have any joint')
+                    pass
 
         # delete low score subsets
         keep = np.logical_and(subsets[:, -1] >= params['n_subset_limbs_thresh'], subsets[:, -2]/subsets[:, -1] >= params['subset_score_thresh'])

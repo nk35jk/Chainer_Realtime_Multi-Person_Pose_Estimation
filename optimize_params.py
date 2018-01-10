@@ -1,4 +1,5 @@
 import os
+import sys
 import cv2
 import time
 import json
@@ -30,6 +31,8 @@ def parse_args():
     parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
     parser.add_argument('--mask', action='store_true')
     parser.add_argument('--out', '-o', default='result', help='Output directory')
+    parser.set_defaults(precise=True)
+    parser.set_defaults(mask=False)
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -39,10 +42,11 @@ def parse_args():
 
 class Objective(object):
 
-    def __init__(self):
+    def __init__(self, path):
         self.coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
         self.eval_loader = CocoDataLoader(self.coco_val, params['inference_img_size'], mode='eval', n_samples=None)
         self.pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask)
+        self.path = path
 
     def __call__(self, p):
         for key in p.keys():
@@ -50,14 +54,15 @@ class Objective(object):
 
         res = []
         imgIds = []
-        for i in range(2000, 2100):
+        for i in range(2000, 2400):
             img, annotations, img_id = self.eval_loader.get_example(i)
 
             imgIds.append(img_id)
 
             st = time.time()
             poses, scores = self.pose_detector(img)
-            print('inference: {:.2f}s'.format(time.time() - st))
+            sys.stdout.write('\rinference: {:.2f}s'.format(time.time() - st))
+            # print('inference: {:.2f}s'.format(time.time() - st))
 
             for pose, score in zip(poses, scores):
                 res_dict = {}
@@ -73,6 +78,8 @@ class Objective(object):
                 res_dict['keypoints'] = keypoints.ravel()
                 res.append(res_dict)
 
+        print('')
+
         try:
             cocoDt = self.coco_val.loadRes(res)
             cocoEval = COCOeval(self.coco_val, cocoDt, 'keypoints')
@@ -81,27 +88,34 @@ class Objective(object):
             cocoEval.accumulate()
             cocoEval.summarize()
             ap = cocoEval.stats[0]
-
-            path = os.path.join(args.out, 'optimize_log_{}.csv'.format(args.arch))
-            with open(path, 'a') as f:
-                f.write('{}, {}, {}, {}, {}, {}, {}\n'.format(
-                    ap,
-                    p['n_integ_points'],
-                    p['n_integ_points_thresh'],
-                    p['heatmap_peak_thresh'],
-                    p['inner_product_thresh'],
-                    p['limb_length_ratio'],
-                    p['subset_score_thresh'],
-                ))
         except:
             ap = 0
+
+        with open(self.path, 'a') as f:
+            f.write('{}, {}, {}, {}, {}, {}, {}, {}\n'.format(
+                ap,
+                p['n_integ_points'],
+                p['n_integ_points_thresh'],
+                p['heatmap_peak_thresh'],
+                p['inner_product_thresh'],
+                p['limb_length_ratio'],
+                p['n_subset_limbs_thresh'],
+                p['subset_score_thresh'],
+            ))
+
         return -ap
 
 
 if __name__ == '__main__':
     args = parse_args()
 
-    objective = Objective()
+    path = os.path.join(args.out, 'optimize_log_{}.csv'.format(args.arch))
+    with open(path, 'a') as f:
+        f.write('AP, n_integ_points, n_integ_points_thresh, heatmap_peak_thresh, ' \
+                'inner_product_thresh, limbs_len_ratio, n_subset_limbs_thresh, ' \
+                'subset_score_thresh\n')
+
+    objective = Objective(path)
 
     space = {
         'n_integ_points': hp.quniform('n_integ_points', 10, 15, 1),  # 10
