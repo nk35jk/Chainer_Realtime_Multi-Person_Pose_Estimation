@@ -348,7 +348,7 @@ if __name__ == '__main__':
     teacher = None
     if args.distill:
         teacher = posenet.PoseNet()
-        serializers.load_npz('models/posenet_iter_200000', teacher)
+        serializers.load_npz('models/posenet_190k_ap_0.544.npz', teacher)
         teacher.disable_update()
         if args.gpu >= 0:
             teacher.to_gpu()
