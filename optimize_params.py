@@ -54,7 +54,7 @@ class Objective(object):
 
         res = []
         imgIds = []
-        for i in range(2000, 2400):
+        for i in range(1000, len(self.eval_loader)):
             img, annotations, img_id = self.eval_loader.get_example(i)
 
             imgIds.append(img_id)

@@ -79,7 +79,9 @@ def evaluate():
             #         cv2.circle(img, tuple(joint.tolist()), 3, (0, 0, 255), -1)
 
             cv2.imshow('results', img)
-            cv2.waitKey(1)
+            k = cv2.waitKey(1)
+            if k == ord('q'):
+                exit()
 
         # # GT (test)
         # for ann in annotations:
@@ -103,6 +105,9 @@ def evaluate():
     cocoEval.evaluate()
     cocoEval.accumulate()
     cocoEval.summarize()
+    ap = cocoEval.stats[0]
+    with open('/'.join(args.weights.split('/')[:-1]), 'a') as f:
+        f.write('{}, {}\n'.format(args.weights, ap))
 
 if __name__ == '__main__':
     args = parse_args()
