@@ -44,7 +44,7 @@ def test():
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
     eval_loader = CocoDataLoader(coco_val, pose_detector.model.insize, mode='eval', n_samples=None)
 
-    f = open(os.path.join(output_dir, 'vis.html'), 'a')
+    f = open(os.path.join(output_dir, 'vis.html'), 'w')
     f.write('<head><link rel="stylesheet" type="text/css" href="style.css"></head>')
 
     all_res = []
@@ -150,6 +150,7 @@ def test():
             + '\n'
         )
         f.write('</div>')
+    f.close()
 
 
 if __name__ == '__main__':
