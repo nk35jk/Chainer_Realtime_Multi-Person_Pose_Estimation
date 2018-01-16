@@ -35,7 +35,7 @@ class CocoDataLoader(DatasetMixin):
         value = saturation.copy()
         hsv_paf = np.vstack((hue[np.newaxis], saturation[np.newaxis], value[np.newaxis])).transpose(1, 2, 0)
         rgb_paf = cv2.cvtColor((hsv_paf * 255).astype(np.uint8), cv2.COLOR_HSV2BGR)
-        img = cv2.addWeighted(img, 0.7, rgb_paf, 0.3, 0)
+        img = cv2.addWeighted(img, 0.6, rgb_paf, 0.4, 0)
         return img
 
     def overlay_pafs(self, img, pafs):
@@ -53,7 +53,7 @@ class CocoDataLoader(DatasetMixin):
 
     def overlay_heatmap(self, img, heatmap):
         rgb_heatmap = cv2.applyColorMap((heatmap * 255).astype(np.uint8), cv2.COLORMAP_JET)
-        img = cv2.addWeighted(img, 0.7, rgb_heatmap, 0.3, 0)
+        img = cv2.addWeighted(img, 0.6, rgb_heatmap, 0.4, 0)
         return img
 
     def overlay_ignore_mask(self, img, ignore_mask):
@@ -413,7 +413,7 @@ if __name__ == '__main__':
             # view
             img = resized_img.copy()
             img = data_loader.overlay_pafs(img, pafs)
-            img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
+            # img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
             img = data_loader.overlay_ignore_mask(img, ignore_mask)
             # img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
 

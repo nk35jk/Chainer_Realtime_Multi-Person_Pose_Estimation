@@ -191,6 +191,8 @@ def parse_args():
                         help='Initialize the trainer from given file')
     parser.add_argument('--out', '-o', default='result/test',
                         help='Output directory')
+    parser.add_argument('--stages', '-s', type=int, default=6,
+                        help='number of posenet stages')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--mask', action='store_true')
     parser.add_argument('--distill', action='store_true')

@@ -98,6 +98,7 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t,
             soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs)
             soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps)
             total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
+            # total_loss += soft_pafs_loss + soft_heatmaps_loss  # only soft target
 
         paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
         heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
@@ -297,7 +298,10 @@ if __name__ == '__main__':
     np.random.seed(0)
     random.seed(0)
 
-    model = params['archs'][args.arch](compute_mask=args.mask)
+    if args.arch == 'poenet':
+        model = params['archs'][args.arch](stages=args.stages, compute_mask=args.mask)
+    else:
+        model = params['archs'][args.arch](compute_mask=args.mask)
 
     # Load the datasets
     coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
