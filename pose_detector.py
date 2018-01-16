@@ -703,8 +703,7 @@ class PoseDetector(object):
         # import ipdb; ipdb.set_trace()
 
         if self.device >= 0:
-            self.pafs = cuda.to_gpu(self.pafs)
-            # self.heatmaps = cuda.to_gpu(self.heatmaps)
+            self.pafs = cuda.to_cpu(self.pafs)
             # cuda.get_device_from_id(self.device).synchronize()
         # print('forward: {:.2f}s'.format(time.time() - st))
 
@@ -718,7 +717,7 @@ class PoseDetector(object):
         scores = subsets[:, -2]
 
         if self.device >= 0:
-            self.heatmaps = cuda.to_gpu(self.heatmaps)
+            self.heatmaps = cuda.to_cpu(self.heatmaps)
 
         # ### for debug
         # print('Number of candidate peaks: {}'.format(len(self.all_peaks)))
