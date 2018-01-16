@@ -693,38 +693,41 @@ class PoseDetector(object):
             # tmp_heatmap = tmp_heatmap[:, :, :padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1]]
             # heatmaps_sum += F.resize_images(tmp_heatmap, (orig_img_h, orig_img_w)).data[0]
 
-        pafs = (pafs_sum / len(params['inference_scales'])).transpose(2, 0, 1)
-        heatmaps = (heatmaps_sum / len(params['inference_scales'])).transpose(2, 0, 1)
-        # heatmaps = (heatmaps_sum / len(params['inference_scales']))
+        self.pafs = (pafs_sum / len(params['inference_scales'])).transpose(2, 0, 1)
+        self.heatmaps = (heatmaps_sum / len(params['inference_scales'])).transpose(2, 0, 1)
+        # self.heatmaps = (heatmaps_sum / len(params['inference_scales']))
 
         # plt.imshow(orig_img[..., ::-1])
-        # plt.imshow(heatmaps[2], alpha=.5, cmap='jet')
+        # plt.imshow(self.heatmaps[2], alpha=.5, cmap='jet')
         # plt.show()
         # import ipdb; ipdb.set_trace()
 
-        # if self.device >= 0:
-        #     pafs = cuda.to_gpu(pafs)
-        #     heatmaps = cuda.to_gpu(heatmaps)
-        #     cuda.get_device_from_id(self.device).synchronize()
+        if self.device >= 0:
+            self.pafs = cuda.to_gpu(self.pafs)
+            # self.heatmaps = cuda.to_gpu(self.heatmaps)
+            # cuda.get_device_from_id(self.device).synchronize()
         # print('forward: {:.2f}s'.format(time.time() - st))
 
-        all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
-        if len(all_peaks) == 0:
+        self.all_peaks = self.compute_peaks_from_heatmaps(self.heatmaps)
+        if len(self.all_peaks) == 0:
             return np.empty((0, len(JointType), 3)), np.empty(0)
-        all_connections = self.compute_connections(pafs, all_peaks, orig_img_w, params)
-        subsets = self.grouping_key_points(all_connections, all_peaks, params)
-        # subsets_ = self.compute_subsets(pafs, all_peaks, orig_img_h, params)
-        poses = self.subsets_to_pose_array(subsets, all_peaks)
+        all_connections = self.compute_connections(self.pafs, self.all_peaks, orig_img_w, params)
+        subsets = self.grouping_key_points(all_connections, self.all_peaks, params)
+        # subsets_ = self.compute_subsets(self.pafs, self.all_peaks, orig_img_h, params)
+        poses = self.subsets_to_pose_array(subsets, self.all_peaks)
         scores = subsets[:, -2]
 
+        if self.device >= 0:
+            self.heatmaps = cuda.to_gpu(self.heatmaps)
+
         # ### for debug
-        # print('Number of candidate peaks: {}'.format(len(all_peaks)))
+        # print('Number of candidate peaks: {}'.format(len(self.all_peaks)))
         # joint_colors = [
         #     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0],
         #     [85, 255, 0], [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255],
         #     [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], [170, 0, 255],
         #     [255, 0, 255], [255, 0, 170], [255, 0, 85]]
-        # for all_peak in all_peaks:
+        # for all_peak in self.all_peaks:
         #     cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
         # cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
         # ###

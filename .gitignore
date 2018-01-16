@@ -12,3 +12,4 @@ result.png
 *.npz
 *.pdf
 *.dot
+vis/
