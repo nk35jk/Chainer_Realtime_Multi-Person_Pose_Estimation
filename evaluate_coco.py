@@ -106,7 +106,7 @@ def evaluate():
     cocoEval.accumulate()
     cocoEval.summarize()
     ap = cocoEval.stats[0]
-    with open('/'.join(args.weights.split('/')[:-1]), 'a') as f:
+    with open('{}/evaluation_results.txt'.format('/'.join(args.weights.split('/')[:-1])), 'a') as f:
         f.write('{}, {}\n'.format(args.weights, ap))
 
 if __name__ == '__main__':
