@@ -77,13 +77,16 @@ def test():
             res.append(res_dict)
 
         # evaluate single image
-        cocoDt = coco_val.loadRes(res)
-        cocoEval = COCOeval(coco_val, cocoDt, 'keypoints')
-        cocoEval.params.imgIds = [img_id]
-        cocoEval.evaluate()
-        cocoEval.accumulate()
-        cocoEval.summarize()
-        ap = cocoEval.stats[0]
+        if len(res) == 0:
+            ap = -1
+        else:
+            cocoDt = coco_val.loadRes(res)
+            cocoEval = COCOeval(coco_val, cocoDt, 'keypoints')
+            cocoEval.params.imgIds = [img_id]
+            cocoEval.evaluate()
+            cocoEval.accumulate()
+            cocoEval.summarize()
+            ap = cocoEval.stats[0]
 
         # import IPython; IPython.embed()
 
