@@ -153,7 +153,7 @@ class Updater(StandardUpdater):
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch in ['resnetfpn', 'pspnet', 'cpn', 'mobilenet']:
+            elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
                 optimizer.target.res.enable_update()
             elif args.arch in ['nn1', 'student']:
                 model.squeeze.enable_update()
