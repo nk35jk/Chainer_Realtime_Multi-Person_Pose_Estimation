@@ -307,7 +307,7 @@ class CocoDataLoader(DatasetMixin):
             valid_annotations_for_img = []
             for annotation in annotations_for_img:
                 # if too few keypoints or too small
-                if annotation['num_keypoints'] >= 5 and annotation['area'] > 32 * 32:
+                if annotation['num_keypoints'] >= params['min_keypoints'] and annotation['area'] > params['min_area']:
                     person_cnt += 1
                     valid_annotations_for_img.append(annotation)
 
@@ -413,7 +413,7 @@ if __name__ == '__main__':
             # view
             img = resized_img.copy()
             img = data_loader.overlay_pafs(img, pafs)
-            # img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
+            img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
             img = data_loader.overlay_ignore_mask(img, ignore_mask)
             # img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
 

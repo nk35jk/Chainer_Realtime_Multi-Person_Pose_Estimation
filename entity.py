@@ -1,4 +1,3 @@
-import argparse
 from enum import IntEnum
 
 from models.CocoPoseNet import CocoPoseNet
@@ -165,39 +164,3 @@ params = {
         [[0, 17], [17, 18], [18, 19], [19, 20]],
     ],
 }
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Train pose estimation')
-    parser.add_argument('--arch', '-a', choices=params['archs'].keys(), default='posenet',
-                        help='Model architecture')
-    parser.add_argument('--batchsize', '-B', type=int, default=10,
-                        help='Learning minibatch size')
-    parser.add_argument('--valbatchsize', '-b', type=int, default=4,
-                        help='Validation minibatch size')
-    parser.add_argument('--val_samples', type=int, default=100,
-                        help='Number of validation samples')
-    parser.add_argument('--eval_samples', type=int, default=100,
-                        help='Number of validation samples')
-    parser.add_argument('--iteration', '-i', type=int, default=300000,
-                        help='Number of iterations to train')
-    parser.add_argument('--gpu', '-g', type=int, default=-1,
-                        help='GPU ID (negative value indicates CPU')
-    parser.add_argument('--initmodel',
-                        help='Initialize the model from given file')
-    parser.add_argument('--loaderjob', '-j', type=int,
-                        help='Number of parallel data loading processes')
-    parser.add_argument('--resume', '-r', default='',
-                        help='Initialize the trainer from given file')
-    parser.add_argument('--out', '-o', default='result/test',
-                        help='Output directory')
-    parser.add_argument('--stages', '-s', type=int, default=6,
-                        help='number of posenet stages')
-    parser.add_argument('--test', action='store_true')
-    parser.add_argument('--mask', action='store_true')
-    parser.add_argument('--distill', action='store_true')
-    parser.set_defaults(test=False)
-    parser.set_defaults(mask=False)
-    parser.set_defaults(distill=False)
-    args = parser.parse_args()
-    return args

@@ -14,16 +14,20 @@ from models.CocoPoseNet import CocoPoseNet
 
 
 class PoseDetector(object):
-    def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False, compute_mask=False):
+    def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False, compute_mask=False, stages=6):
         self.arch = arch
         self.precise = precise
         self.compute_mask = compute_mask
         if model is not None:
             self.model = model
         else:
-            # load model
+            # Load model
             print('Loading the model...')
-            self.model = params['archs'][arch](compute_mask=compute_mask)
+            if arch == 'posenet':
+                self.model = posenet.PoseNet(stages=stages, compute_mask=compute_mask)
+            else:
+                self.model = params['archs'][arch](compute_mask=compute_mask)
+
             if weights_file:
                 serializers.load_npz(weights_file, self.model)
 
@@ -826,6 +830,7 @@ if __name__ == '__main__':
     parser.add_argument('weights', help='weights file path')
     parser.add_argument('--img', '-i', default=None, help='image file path')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--stages', '-s', type=int, default=6, help='number of posenet stages')
     parser.add_argument('--mask', action='store_true')
     parser.add_argument('--precise', action='store_true', help='visualize results')
     args = parser.parse_args()
@@ -837,7 +842,7 @@ if __name__ == '__main__':
     chainer.config.train = False
 
     # load model
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask, stages=args.stages)
 
     # while True:
     for i in range(20):

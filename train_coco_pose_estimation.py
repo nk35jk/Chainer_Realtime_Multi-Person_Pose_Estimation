@@ -4,6 +4,7 @@ import copy
 import json
 import glob
 import random
+import argparse
 import datetime
 import numpy as np
 import multiprocessing
@@ -17,7 +18,7 @@ from chainer import cuda, training, reporter, function
 from chainer.training import StandardUpdater, extensions
 from chainer import serializers, optimizers, functions as F
 
-from entity import JointType, params, parse_args
+from entity import JointType, params
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
@@ -67,13 +68,13 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t,
             stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
             stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
             stage_mask_masks = F.resize_images(stage_mask_masks.astype('f'), pafs_y.shape[2:]).data > 0
-
-            if device >= 0:
-                stage_mask_t = cuda.to_cpu(stage_mask_t)
-            stage_mask_t = cv2.resize(stage_mask_t.transpose(1, 2, 0),
-                pafs_y.shape[2:], interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
-            if device >= 0:
-                stage_mask_t = cuda.to_gpu(stage_mask_t)
+            if compute_mask:
+                if device >= 0:
+                    stage_mask_t = cuda.to_cpu(stage_mask_t)
+                stage_mask_t = cv2.resize(stage_mask_t.transpose(1, 2, 0),
+                    pafs_y.shape[2:], interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
+                if device >= 0:
+                    stage_mask_t = cuda.to_gpu(stage_mask_t)
 
         xp = cuda.get_array_module(stage_mask_t)
         stage_mask_t = xp.stack((stage_mask_t, -(stage_mask_t-1)), axis=1)  # for mean_squared_error
@@ -95,10 +96,22 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t,
         if pt_pafs is None:
             total_loss += pafs_loss + heatmaps_loss + params['mask_loss_ratio'] * mask_loss
         else:
-            soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs)
-            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps)
-            total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
-            # total_loss += soft_pafs_loss + soft_heatmaps_loss  # only soft target
+            """distillation"""
+            # modify soft pafs
+            paf_norm = (pt_pafs[:, ::2]**2 + pt_pafs[:, 1::2]**2)
+            paf_norm_m = -(paf_norm - 1)**2 + 1
+            multiplier = np.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
+            pt_pafs_m = np.repeat(multiplier, 2, axis=1) * pt_pafs
+            # modify soft heatmaps
+            pt_heatmaps_m = -(pt_heatmaps - 1)**2 + 1
+            pt_heatmaps_m[:, -1] = pt_heatmaps[:, -1]**2
+
+            # compute soft loss
+            soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs_m)
+            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps_m)
+
+            # total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
+            total_loss += soft_pafs_loss + soft_heatmaps_loss  # only soft target
 
         paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
         heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
@@ -271,10 +284,6 @@ class Evaluator(extensions.Evaluator):
 
             img = draw_person_pose(img, poses)
 
-            # import matplotlib.pyplot as plt
-            # plt.imshow(img[..., ::-1]); plt.show()
-            # cv2.imwrite('result/{}.jpg'.format(img_id), img)
-
         summary = reporter.DictSummary()
         stat_names = ['AP', 'AP50', 'AP75', 'AP_M', 'AP_L', 'AR', 'AR50', 'AR75', 'AR_M', 'AR_L']
         if len(res) > 0:
@@ -292,48 +301,54 @@ class Evaluator(extensions.Evaluator):
         return summary.compute_mean()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train pose estimation')
+    parser.add_argument('--arch', '-a', choices=params['archs'].keys(), default='posenet',
+                        help='Model architecture')
+    parser.add_argument('--batchsize', '-B', type=int, default=10,
+                        help='Learning minibatch size')
+    parser.add_argument('--valbatchsize', '-b', type=int, default=4,
+                        help='Validation minibatch size')
+    parser.add_argument('--val_samples', type=int, default=100,
+                        help='Number of validation samples')
+    parser.add_argument('--eval_samples', type=int, default=100,
+                        help='Number of validation samples')
+    parser.add_argument('--iteration', '-i', type=int, default=300000,
+                        help='Number of iterations to train')
+    parser.add_argument('--gpu', '-g', type=int, default=-1,
+                        help='GPU ID (negative value indicates CPU')
+    parser.add_argument('--initmodel',
+                        help='Initialize the model from given file')
+    parser.add_argument('--loaderjob', '-j', type=int,
+                        help='Number of parallel data loading processes')
+    parser.add_argument('--resume', '-r', default='',
+                        help='Initialize the trainer from given file')
+    parser.add_argument('--out', '-o', default='result/test',
+                        help='Output directory')
+    parser.add_argument('--stages', '-s', type=int, default=6,
+                        help='number of posenet stages')
+    parser.add_argument('--test', action='store_true')
+    parser.add_argument('--mask', action='store_true')
+    parser.add_argument('--distill', action='store_true')
+    parser.set_defaults(test=False)
+    parser.set_defaults(mask=False)
+    parser.set_defaults(distill=False)
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == '__main__':
     args = parse_args()
 
     np.random.seed(0)
     random.seed(0)
 
-    if args.arch == 'poenet':
-        model = params['archs'][args.arch](stages=args.stages, compute_mask=args.mask)
+    # Prepare model
+    if args.arch == 'posenet':
+        model = posenet.PoseNet(stages=args.stages, compute_mask=args.mask)
     else:
         model = params['archs'][args.arch](compute_mask=args.mask)
 
-    # Load the datasets
-    coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
-    coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-    train_loader = CocoDataLoader(coco_train, model.insize, mode='train')
-    val_loader = CocoDataLoader(coco_val, model.insize, mode='val', n_samples=args.val_samples)
-    # eval_loader = CocoDataLoader(coco_val, model, mode='eval', n_samples=args.eval_samples)
-
-    if args.loaderjob:
-        multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug
-        train_iter = chainer.iterators.MultiprocessIterator(
-            train_loader, args.batchsize, n_processes=args.loaderjob)
-        val_iter = chainer.iterators.MultiprocessIterator(
-            val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
-        # eval_iter = chainer.iterators.MultiprocessIterator(
-        #     eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False, shared_mem=None)
-    else:
-        train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
-        val_iter = chainer.iterators.SerialIterator(
-            val_loader, args.valbatchsize, repeat=False, shuffle=False)
-        # eval_iter = chainer.iterators.SerialIterator(
-        #     eval_loader, 1, repeat=False, shuffle=False)
-
-    if not os.path.exists(args.out):
-        os.makedirs(args.out)
-    txt = '@{}'.format(datetime.datetime.now().strftime('%y%m%d_%H%M'))
-    with open(os.path.join(args.out, txt), 'w') as f:
-        pass
-    with open(os.path.join(args.out, 'params.json'), 'w') as f:
-        json.dump(vars(args), f)
-
-    # Prepare model
     if args.arch == 'posenet':
         posenet.copy_vgg_params(model)
     elif args.arch in ['nn1', 'student']:
@@ -345,17 +360,19 @@ if __name__ == '__main__':
         print('Load model from', args.initmodel)
         chainer.serializers.load_npz(args.initmodel, model)
 
+    # Prepare teacher model for distillation
     teacher = None
     if args.distill:
         teacher = posenet.PoseNet()
         serializers.load_npz('models/posenet_190k_ap_0.544.npz', teacher)
         teacher.disable_update()
-        if args.gpu >= 0:
-            teacher.to_gpu()
 
+    # Set up GPU
     if args.gpu >= 0:
         chainer.cuda.get_device_from_id(args.gpu).use()
         model.to_gpu()
+        if args.distill:
+            teacher.to_gpu()
 
     # Set up an optimizer
     # optimizer = optimizers.MomentumSGD(lr=1e-3, momentum=0.9)
@@ -380,6 +397,29 @@ if __name__ == '__main__':
         elif args.arch in ['nn1', 'student']:
             model.squeeze.disable_update()
 
+    # Load datasets
+    coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
+    coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
+    train_loader = CocoDataLoader(coco_train, model.insize, mode='train')
+    val_loader = CocoDataLoader(coco_val, model.insize, mode='val', n_samples=args.val_samples)
+    # eval_loader = CocoDataLoader(coco_val, model, mode='eval', n_samples=args.eval_samples)
+
+    # Set up iterators
+    if args.loaderjob:
+        multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug
+        train_iter = chainer.iterators.MultiprocessIterator(
+            train_loader, args.batchsize, n_processes=args.loaderjob)
+        val_iter = chainer.iterators.MultiprocessIterator(
+            val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
+        # eval_iter = chainer.iterators.MultiprocessIterator(
+        #     eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False, shared_mem=None)
+    else:
+        train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
+        val_iter = chainer.iterators.SerialIterator(
+            val_loader, args.valbatchsize, repeat=False, shuffle=False)
+        # eval_iter = chainer.iterators.SerialIterator(
+        #     eval_loader, 1, repeat=False, shuffle=False)
+
     # Set up a trainer
     updater = Updater(train_iter, model, teacher, optimizer, args.mask, device=args.gpu)
     trainer = training.Trainer(updater, (args.iteration, 'iteration'), args.out)
@@ -387,7 +427,6 @@ if __name__ == '__main__':
     val_interval = (10 if args.test else 1000), 'iteration'
     log_interval = (1 if args.test else 20), 'iteration'
 
-    # trainer.extend(extensions.LinearShift('alpha', (1e-4, 5e-6), (1, 1000000)))
     trainer.extend(Validator(val_iter, model, teacher, args.mask, device=args.gpu),
                    trigger=val_interval)
     # trainer.extend(Evaluator(coco_val, eval_iter, model, args.mask, device=args.gpu),
@@ -405,5 +444,14 @@ if __name__ == '__main__':
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
+
+    # Save training parameters
+    if not os.path.exists(args.out):
+        os.makedirs(args.out)
+    txt = '@{}'.format(datetime.datetime.now().strftime('%y%m%d_%H%M'))
+    with open(os.path.join(args.out, txt), 'w') as f:
+        pass
+    with open(os.path.join(args.out, 'params.json'), 'w') as f:
+        json.dump(vars(args), f)
 
     trainer.run()
