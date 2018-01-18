@@ -97,18 +97,18 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t,
             total_loss += pafs_loss + heatmaps_loss + params['mask_loss_ratio'] * mask_loss
         else:
             """distillation"""
-            # modify soft pafs
-            paf_norm = (pt_pafs[:, ::2]**2 + pt_pafs[:, 1::2]**2)
-            paf_norm_m = -(paf_norm - 1)**2 + 1
-            multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
-            pt_pafs_m = xp.repeat(multiplier, 2, axis=1) * pt_pafs
-            # modify soft heatmaps
-            pt_heatmaps_m = -(pt_heatmaps - 1)**2 + 1
-            pt_heatmaps_m[:, -1] = pt_heatmaps[:, -1]**2
+            # # modify soft pafs
+            # paf_norm = (pt_pafs[:, ::2]**2 + pt_pafs[:, 1::2]**2)
+            # paf_norm_m = -(paf_norm - 1)**2 + 1
+            # multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
+            # pt_pafs_m = xp.repeat(multiplier, 2, axis=1) * pt_pafs
+            # # modify soft heatmaps
+            # pt_heatmaps_m = -(pt_heatmaps - 1)**2 + 1
+            # pt_heatmaps_m[:, -1] = pt_heatmaps[:, -1]**2
 
             # compute soft loss
-            soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs_m)
-            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps_m)
+            soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs)
+            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps)
 
             # total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
             total_loss += soft_pafs_loss + soft_heatmaps_loss  # only soft target
