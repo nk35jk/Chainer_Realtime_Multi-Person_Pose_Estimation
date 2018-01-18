@@ -31,15 +31,17 @@ class MobileNet(chainer.Chain):
 
     def __init__(self, joints=19, limbs=38, compute_mask=False):
         super(MobileNet, self).__init__()
+        self.joints = joints
+        self.limbs = limbs
         with self.init_scope():
-            self.conv1 = L.Convolution2D(3, 32, 3, stride=2, pad=1, nobias=True)
+            self.conv1 = L.Convolution2D(3, 32, 3, stride=2, pad=1, nobias=True)  # 1/2
             self.conv1_bn = L.BatchNormalization(32)
 
             self.conv2_1_dw = L.DepthwiseConvolution2D(32, 1, 3, stride=1, pad=1, nobias=True)
             self.conv2_1_dw_bn = L.BatchNormalization(32)
             self.conv2_1_sp = L.Convolution2D(32, 64, 1, nobias=True)
             self.conv2_1_sp_bn = L.BatchNormalization(64)
-            self.conv2_2_dw = L.DepthwiseConvolution2D(64, 1, 3, stride=2, pad=1, nobias=True)
+            self.conv2_2_dw = L.DepthwiseConvolution2D(64, 1, 3, stride=2, pad=1, nobias=True)  # 1/4
             self.conv2_2_dw_bn = L.BatchNormalization(64)
             self.conv2_2_sp = L.Convolution2D(64, 128, 1, nobias=True)
             self.conv2_2_sp_bn = L.BatchNormalization(128)
@@ -48,7 +50,7 @@ class MobileNet(chainer.Chain):
             self.conv3_1_dw_bn = L.BatchNormalization(128)
             self.conv3_1_sp = L.Convolution2D(128, 128, 1, nobias=True)
             self.conv3_1_sp_bn = L.BatchNormalization(128)
-            self.conv3_2_dw = L.DepthwiseConvolution2D(128, 1, 3, stride=2, pad=1, nobias=True)
+            self.conv3_2_dw = L.DepthwiseConvolution2D(128, 1, 3, stride=2, pad=1, nobias=True)  # 1/8
             self.conv3_2_dw_bn = L.BatchNormalization(128)
             self.conv3_2_sp = L.Convolution2D(128, 256, 1, nobias=True)
             self.conv3_2_sp_bn = L.BatchNormalization(256)
@@ -57,7 +59,7 @@ class MobileNet(chainer.Chain):
             self.conv4_1_dw_bn = L.BatchNormalization(256)
             self.conv4_1_sp = L.Convolution2D(256, 256, 1, nobias=True)
             self.conv4_1_sp_bn = L.BatchNormalization(256)
-            self.conv4_2_dw = L.DepthwiseConvolution2D(256, 1, 3, stride=2, pad=1, nobias=True)  # stride
+            self.conv4_2_dw = L.DepthwiseConvolution2D(256, 1, 3, stride=1, pad=1, nobias=True)  # stride=2
             self.conv4_2_dw_bn = L.BatchNormalization(256)
             self.conv4_2_sp = L.Convolution2D(256, 512, 1, nobias=True)
             self.conv4_2_sp_bn = L.BatchNormalization(512)
@@ -82,7 +84,7 @@ class MobileNet(chainer.Chain):
             self.conv5_5_dw_bn = L.BatchNormalization(512)
             self.conv5_5_sp = L.Convolution2D(512, 512, 1, nobias=True)
             self.conv5_5_sp_bn = L.BatchNormalization(512)
-            self.conv5_6_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=2, pad=1, nobias=True)
+            self.conv5_6_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=1, pad=1, nobias=True)  # stride=2
             self.conv5_6_dw_bn = L.BatchNormalization(512)
             self.conv5_6_sp = L.Convolution2D(512, 1024, 1, nobias=True)
             self.conv5_6_sp_bn = L.BatchNormalization(1024)
@@ -92,11 +94,11 @@ class MobileNet(chainer.Chain):
             self.conv6_sp = L.Convolution2D(1024, 1024, 1, nobias=True)
             self.conv6_sp_bn = L.BatchNormalization(1024)
 
-            self.fc7 = L.Linear(1024, 1000)
+            self.conv7_dw = L.DepthwiseConvolution2D(1024, 1, 3, stride=1, pad=1, nobias=True)
+            self.conv7_dw_bn = L.BatchNormalization(1024)
+            self.conv7_sp = L.Convolution2D(1024, limbs+joints, 1, nobias=True)
 
-        self.joints = joints
-        self.limbs = limbs
-
+            # self.fc7 = L.Linear(1024, 1000)
 
     def __call__(self, x):
         pafs, heatmaps = [], []
@@ -134,10 +136,14 @@ class MobileNet(chainer.Chain):
         h = F.relu(self.conv6_dw_bn(self.conv6_dw(h)))
         h = F.relu(self.conv6_sp_bn(self.conv6_sp(h)))
 
-        h = F.average_pooling_2d(h, 7)
+        h = F.relu(self.conv7_dw_bn(self.conv7_dw(h)))
+        h = self.conv7_sp(h)
 
-        h = self.fc7(h)
+        pafs.append(h[:, :self.limbs])
+        heatmaps.append(h[:, -self.joints:])
 
+        # h = F.average_pooling_2d(h, 7)
+        # h = self.fc7(h)
 
         return pafs, heatmaps
 

@@ -7,6 +7,7 @@ from models.resnetfpn import ResNetFPN
 from models.pspnet import PSPNet
 from models.student import Student
 from models.cpn import CPN
+from models.mobilenet import MobileNet
 
 from models.FaceNet import FaceNet
 from models.HandNet import HandNet
@@ -64,6 +65,7 @@ params = {
         'pspnet': PSPNet,
         'student': Student,
         'cpn': CPN,
+        'mobilenet': MobileNet,
     },
     # training params
     'min_keypoints': 5,

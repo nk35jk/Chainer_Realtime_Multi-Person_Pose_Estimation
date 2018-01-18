@@ -22,7 +22,7 @@ from entity import JointType, params
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
-from models import CocoPoseNet, posenet, nn1, resnetfpn, pspnet, student, cpn
+from models import CocoPoseNet, posenet, nn1, resnetfpn, pspnet, student, cpn, mobilenet
 
 
 class GradientScaling(object):
@@ -129,7 +129,7 @@ def preprocess(imgs):
     if args.arch in ['posenet']:
         x_data /= 255
         x_data -= 0.5
-    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'student', 'cpn']:
+    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'student', 'cpn', 'mobilenet']:
         x_data -= xp.array([104, 117, 123])
     x_data = x_data.transpose(0, 3, 1, 2)
     return x_data
@@ -153,7 +153,7 @@ class Updater(StandardUpdater):
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
+            elif args.arch in ['resnetfpn', 'pspnet', 'cpn', 'mobilenet']:
                 optimizer.target.res.enable_update()
             elif args.arch in ['nn1', 'student']:
                 model.squeeze.enable_update()
