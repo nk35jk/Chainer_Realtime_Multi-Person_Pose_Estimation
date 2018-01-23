@@ -305,6 +305,7 @@ def parse_args():
     parser.add_argument('--only_soft', action='store_true')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
+    parser.set_defaults(modify=False)
     parser.set_defaults(only_soft=False)
     args = parser.parse_args()
     return args
