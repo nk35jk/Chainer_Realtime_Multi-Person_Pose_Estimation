@@ -76,18 +76,21 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
             total_loss += pafs_loss + heatmaps_loss
         else:
             """distillation"""
-            # modify soft pafs
-            paf_norm = (pt_pafs[:, ::2]**2 + pt_pafs[:, 1::2]**2)
-            paf_norm_m = -(paf_norm - 1)**2 + 1
-            multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
-            pt_pafs_m = xp.repeat(multiplier, 2, axis=1) * pt_pafs
-            # modify soft heatmaps
-            pt_heatmaps_m = -(pt_heatmaps - 1)**2 + 1
-            pt_heatmaps_m[:, -1] = pt_heatmaps[:, -1]**2
+            if args.modify:
+                # modify soft pafs
+                paf_norm = (pt_pafs[:, ::2]**2 + pt_pafs[:, 1::2]**2)
+                paf_norm_m = -(paf_norm - 1)**2 + 1
+                multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
+                pt_pafs_m = xp.repeat(multiplier, 2, axis=1) * pt_pafs
+                # modify soft heatmaps
+                pt_heatmaps_m = -(pt_heatmaps - 1)**2 + 1
+                pt_heatmaps_m[:, -1] = pt_heatmaps[:, -1]**2
 
-            # compute soft loss
-            soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs_m)
-            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps_m)
+                soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs_m)
+                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps_m)
+            else:
+                soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs)
+                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps)
 
             if args.only_soft:
                 total_loss += soft_pafs_loss + soft_heatmaps_loss
@@ -298,6 +301,7 @@ def parse_args():
                         help='number of posenet stages')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--distill', action='store_true')
+    parser.add_argument('--modify', action='store_true')
     parser.add_argument('--only_soft', action='store_true')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
