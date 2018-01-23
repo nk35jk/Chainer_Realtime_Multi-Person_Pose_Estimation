@@ -113,7 +113,8 @@ class PoseDetector(object):
                 all_peaks.append(peaks_with_score_and_id)
             all_peaks = xp.array([peak for peaks_each_category in all_peaks for peak in peaks_each_category])
         else:
-            heatmaps = F.convolution_2d(heatmaps[:, None], self.gaussian_kernel, stride=1, pad=int(params['ksize']/2)).data.squeeze()
+            heatmaps = F.convolution_2d(heatmaps[:, None], self.gaussian_kernel,
+                                        stride=1, pad=int(params['ksize']/2)).data.squeeze()
             left_heatmaps = xp.zeros(heatmaps.shape)
             right_heatmaps = xp.zeros(heatmaps.shape)
             top_heatmaps = xp.zeros(heatmaps.shape)
@@ -550,31 +551,19 @@ class PoseDetector(object):
         st = time.time()
         orig_img_h, orig_img_w, _ = orig_img.shape
 
-        resized_output_img_w, resized_output_img_h = self.compute_optimal_size(orig_img, params['heatmap_size'])
+        input_w, input_h = self.compute_optimal_size(orig_img, params['inference_img_size'])
+        map_w, map_h = self.compute_optimal_size(orig_img, params['heatmap_size'])
 
-        pafs_sum = 0
-        heatmaps_sum = 0
+        resized_image = cv2.resize(orig_img, (input_w, input_h))
+        x_data = self.preprocess(resized_image)
 
-        scales = params['inference_scales']
+        if self.device >= 0:
+            x_data = cuda.to_gpu(x_data)
 
-        for scale in scales:
-            print('Inference scale: {:.1f}...'.format(scale))
-            img_size = int(params['inference_img_size'] * scale)
-            resized_input_img_w, resized_input_img_h = self.compute_optimal_size(orig_img, img_size)
+        h1s, h2s = self.model(x_data)
 
-            resized_image = cv2.resize(orig_img, (resized_input_img_w, resized_input_img_h))
-            x_data = self.preprocess(resized_image)
-
-            if self.device >= 0:
-                x_data = cuda.to_gpu(x_data)
-
-            h1s, h2s = self.model(x_data)
-
-            pafs_sum += F.resize_images(h1s[-1], (resized_output_img_h, resized_output_img_w)).data[0]
-            heatmaps_sum += F.resize_images(h2s[-1], (resized_output_img_h, resized_output_img_w)).data[0]
-
-        pafs = pafs_sum / len(scales)
-        heatmaps = heatmaps_sum / len(scales)
+        pafs += F.resize_images(h1s[-1], (map_h, map_w)).data[0]
+        heatmaps += F.resize_images(h2s[-1], (map_h, map_w)).data[0]
 
         if self.device >= 0:
             pafs = pafs.get()
@@ -584,10 +573,10 @@ class PoseDetector(object):
         all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
         if len(all_peaks) == 0:
             return np.empty((0, len(JointType), 3)), np.empty(0)
-        all_connections = self.compute_connections(pafs, all_peaks, resized_output_img_w, params)
+        all_connections = self.compute_connections(pafs, all_peaks, map_w, params)
         subsets = self.grouping_key_points(all_connections, all_peaks, params)
-        all_peaks[:, 1] *= orig_img_w / resized_output_img_w
-        all_peaks[:, 2] *= orig_img_h / resized_output_img_h
+        all_peaks[:, 1] *= orig_img_w / map_w
+        all_peaks[:, 2] *= orig_img_h / map_h
         poses = self.subsets_to_pose_array(subsets, all_peaks)
         scores = subsets[:, -2]
         return poses, scores
