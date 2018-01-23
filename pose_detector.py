@@ -200,36 +200,6 @@ class PoseDetector(object):
 
         return candidate_connections
 
-
-    def func(self, i, pafs, all_peaks, img_len, params):
-        paf_index = [i*2, i*2 + 1]
-        paf = pafs[paf_index]
-        limb_point = params['limbs_point'][i]
-        cand_a = all_peaks[all_peaks[:, 0] == limb_point[0]][:, 1:]
-        cand_b = all_peaks[all_peaks[:, 0] == limb_point[1]][:, 1:]
-
-        if len(cand_a) > 0 and len(cand_b) > 0:
-            candidate_connections = self.compute_candidate_connections(paf, cand_a, cand_b, img_len, params)
-            connections = np.zeros((0, 3))
-            for index_a, index_b, score in candidate_connections:
-                if index_a not in connections[:, 0] and index_b not in connections[:, 1]:
-                    connections = np.vstack([connections, [index_a, index_b, score]])
-                    if len(connections) >= min(len(cand_a), len(cand_b)):
-                        break
-            return connections
-        return np.zeros((0, 3))
-
-    def wrapper(self, args):
-        return self.func(*args)
-
-    def multi_process(self, pafs, all_peaks, img_len, params):
-        p = multiprocessing.Pool(8)
-        sample_list = [(i, pafs, all_peaks, img_len, params) for i in range(len(params['limbs_point']))]
-        output = p.map(self.wrapper, sample_list)
-        p.close()
-        return output
-
-
     def compute_connections(self, pafs, all_peaks, img_len, params):
         all_connections = []
         for i in range(len(params['limbs_point'])):
@@ -604,8 +574,7 @@ class PoseDetector(object):
         all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
         if len(all_peaks) == 0:
             return np.empty((0, len(JointType), 3)), np.empty(0)
-        # all_connections = self.compute_connections(pafs, all_peaks, map_w, params)
-        all_connections = self.multi_process(pafs, all_peaks, map_w, params)
+        all_connections = self.compute_connections(pafs, all_peaks, map_w, params)
         subsets = self.grouping_key_points(all_connections, all_peaks, params)
         all_peaks[:, 1] *= orig_img_w / map_w
         all_peaks[:, 2] *= orig_img_h / map_h
