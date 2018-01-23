@@ -41,60 +41,39 @@ class GradientScaling(object):
                     grad *= self.scale
 
 
-def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t,
-                 pt_pafs, pt_heatmaps, ignore_mask, stuff_mask, compute_mask,
-                 device):
+def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
+                 pt_pafs, pt_heatmaps, ignore_mask, device):
+    xp = cuda.get_array_module(imgs)
+
     heatmap_loss_log = []
     paf_loss_log = []
-    mask_loss_log = []
     total_loss = 0
 
     paf_masks = ignore_mask[:, None].repeat(pafs_t.shape[1], axis=1)
     heatmap_masks = ignore_mask[:, None].repeat(heatmaps_t.shape[1], axis=1)
-    mask_masks = ignore_mask[:, None].repeat(2, axis=1)
 
     # compute loss on each stage
-    for pafs_y, heatmaps_y, masks_y in zip(pafs_ys, heatmaps_ys, masks_ys):
-        stage_pafs_t = pafs_t.copy()
-        stage_heatmaps_t = heatmaps_t.copy()
-        stage_mask_t = stuff_mask.copy().astype('f')
-        stage_paf_masks = paf_masks.copy()
-        stage_heatmap_masks = heatmap_masks.copy()
-        stage_mask_masks = mask_masks.copy()
+    for pafs_y, heatmaps_y in zip(pafs_ys, heatmaps_ys):
+        if not args.only_soft:
+            stage_pafs_t = pafs_t.copy()
+            stage_heatmaps_t = heatmaps_t.copy()
+            stage_paf_masks = paf_masks.copy()
+            stage_heatmap_masks = heatmap_masks.copy()
 
-        if pafs_y.shape != stage_pafs_t.shape:
-            stage_pafs_t = F.resize_images(stage_pafs_t, pafs_y.shape[2:]).data
-            stage_heatmaps_t = F.resize_images(stage_heatmaps_t, pafs_y.shape[2:]).data
-            stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
-            stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
-            stage_mask_masks = F.resize_images(stage_mask_masks.astype('f'), pafs_y.shape[2:]).data > 0
-            if compute_mask:
-                if device >= 0:
-                    stage_mask_t = cuda.to_cpu(stage_mask_t)
-                stage_mask_t = cv2.resize(stage_mask_t.transpose(1, 2, 0),
-                    pafs_y.shape[2:], interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
-                if device >= 0:
-                    stage_mask_t = cuda.to_gpu(stage_mask_t)
+            if pafs_y.shape != stage_pafs_t.shape:
+                stage_pafs_t = F.resize_images(stage_pafs_t, pafs_y.shape[2:]).data
+                stage_heatmaps_t = F.resize_images(stage_heatmaps_t, pafs_y.shape[2:]).data
+                stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
+                stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
 
-        xp = cuda.get_array_module(stage_mask_t)
-        stage_mask_t = xp.stack((stage_mask_t, -(stage_mask_t-1)), axis=1)  # for mean_squared_error
+            stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
+            stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
 
-        stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
-        stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
-        if compute_mask:
-            stage_mask_t[stage_mask_masks == True] = masks_y.data[stage_mask_masks == True]
-            stage_mask_t[(stage_mask_t == -1) | (stage_mask_t == 2)] = masks_y.data[(stage_mask_t == -1) | (stage_mask_t == 2)]
+            pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
+            heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
 
-        pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
-        heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
-        # heatmaps_loss = F.sum(F.mean(F.squared_error(heatmaps_y, stage_heatmaps_t), axis=0))
-        mask_loss = 0
-        if compute_mask:
-            # mask_loss = F.softmax_cross_entropy(masks_y, stage_mask_t)
-            mask_loss = F.mean_squared_error(masks_y, stage_mask_t)
-
-        if pt_pafs is None:
-            total_loss += pafs_loss + heatmaps_loss + params['mask_loss_ratio'] * mask_loss
+        if not args.distill:
+            total_loss += pafs_loss + heatmaps_loss
         else:
             """distillation"""
             # modify soft pafs
@@ -110,17 +89,19 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, masks_ys, pafs_t, heatmaps_t,
             soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs_m)
             soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps_m)
 
-            # total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
-            total_loss += soft_pafs_loss + soft_heatmaps_loss  # only soft target
+            if args.only_soft:
+                total_loss += soft_pafs_loss + soft_heatmaps_loss
+            else:
+                total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
 
-        paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
-        heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
-        if type(mask_loss) == int:
-            mask_loss_log.append(float(mask_loss))
+        if not args.only_soft:
+            paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
+            heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
         else:
-            mask_loss_log.append(float(cuda.to_cpu(mask_loss.data)))
+            paf_loss_log.append(float(cuda.to_cpu(soft_pafs_loss.data)))
+            heatmap_loss_log.append(float(cuda.to_cpu(soft_heatmaps_loss.data)))
 
-    return total_loss, paf_loss_log, heatmap_loss_log, mask_loss_log
+    return total_loss, paf_loss_log, heatmap_loss_log
 
 
 def preprocess(imgs):
@@ -137,10 +118,9 @@ def preprocess(imgs):
 
 class Updater(StandardUpdater):
 
-    def __init__(self, iterator, model, teacher, optimizer, compute_mask, device=None):
+    def __init__(self, iterator, model, teacher, optimizer, device=None):
         super(Updater, self).__init__(iterator, optimizer, device=device)
         self.teacher = teacher
-        self.compute_mask = compute_mask
 
     def update_core(self):
         train_iter = self.get_iterator('main')
@@ -165,15 +145,11 @@ class Updater(StandardUpdater):
 
         batch = train_iter.next()
 
-        imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
+        imgs, pafs, heatmaps, ignore_mask = self.converter(batch, self.device)
 
         x_data = preprocess(imgs)
 
-        if self.compute_mask:
-            pafs_ys, heatmaps_ys, masks_ys = optimizer.target(x_data)
-        else:
-            pafs_ys, heatmaps_ys = optimizer.target(x_data)
-            masks_ys = [None] * len(pafs_ys)
+        pafs_ys, heatmaps_ys = optimizer.target(x_data)
 
         pt_pafs = pt_heatmaps = None
         if self.teacher:
@@ -182,15 +158,14 @@ class Updater(StandardUpdater):
             pt_pafs = h1s[-1].data
             pt_heatmaps = h2s[-1].data
 
-        loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
-            imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, pt_pafs,
-            pt_heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
+        loss, paf_loss_log, heatmap_loss_log = compute_loss(
+            imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pt_pafs,
+            pt_heatmaps, ignore_mask, self.device)
 
         reporter.report({
             'main/loss': loss,
             'main/paf': sum(paf_loss_log),
             'main/heat': sum(heatmap_loss_log),
-            'main/mask': sum(mask_loss_log),
         })
 
         optimizer.target.cleargrads()
@@ -200,10 +175,9 @@ class Updater(StandardUpdater):
 
 class Validator(extensions.Evaluator):
 
-    def __init__(self, iterator, model, teacher, compute_mask, device=None):
+    def __init__(self, iterator, model, teacher, device=None):
         super(Validator, self).__init__(iterator, model, device=device)
         self.iterator = iterator
-        self.compute_mask = compute_mask
         self.teacher = teacher
 
     def evaluate(self):
@@ -217,15 +191,11 @@ class Validator(extensions.Evaluator):
         for i, batch in enumerate(it):
             observation = {}
             with reporter.report_scope(observation):
-                imgs, pafs, heatmaps, ignore_mask, stuff_mask = self.converter(batch, self.device)
+                imgs, pafs, heatmaps, ignore_mask = self.converter(batch, self.device)
                 with function.no_backprop_mode():
                     x_data = preprocess(imgs)
 
-                    if self.compute_mask:
-                        pafs_ys, heatmaps_ys, masks_ys = model(x_data)
-                    else:
-                        pafs_ys, heatmaps_ys = model(x_data)
-                        masks_ys = [None] * len(pafs_ys)
+                    pafs_ys, heatmaps_ys = model(x_data)
 
                     pt_pafs = pt_heatmaps = None
                     if self.teacher:
@@ -234,24 +204,23 @@ class Validator(extensions.Evaluator):
                         pt_pafs = h1s[-1].data
                         pt_heatmaps = h2s[-1].data
 
-                    loss, paf_loss_log, heatmap_loss_log, mask_loss_log = compute_loss(
-                        imgs, pafs_ys, heatmaps_ys, masks_ys, pafs, heatmaps, pt_pafs,
-                        pt_heatmaps, ignore_mask, stuff_mask, self.compute_mask, self.device)
+                    loss, paf_loss_log, heatmap_loss_log = compute_loss(
+                        imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pt_pafs,
+                        pt_heatmaps, ignore_mask, self.device)
 
                     observation['val/loss'] = cuda.to_cpu(loss.data)
                     observation['val/paf'] = sum(paf_loss_log)
                     observation['val/heat'] = sum(heatmap_loss_log)
-                    observation['val/mask'] = sum(mask_loss_log)
             summary.add(observation)
         return summary.compute_mean()
 
 
 class Evaluator(extensions.Evaluator):
 
-    def __init__(self, cocoGt, iterator, model, compute_mask, device=None):
+    def __init__(self, cocoGt, iterator, model, device=None):
         super(Evaluator, self).__init__(iterator, model, device=device)
         self.cocoGt = cocoGt
-        self.pose_detector = PoseDetector(model=model, device=device, precise=True, compute_mask=args.mask)
+        self.pose_detector = PoseDetector(model=model, device=device, precise=True)
 
     def evaluate(self):
         val_iter = self.get_iterator('main')
@@ -328,11 +297,11 @@ def parse_args():
     parser.add_argument('--stages', '-s', type=int, default=6,
                         help='number of posenet stages')
     parser.add_argument('--test', action='store_true')
-    parser.add_argument('--mask', action='store_true')
     parser.add_argument('--distill', action='store_true')
+    parser.add_argument('--only_soft', action='store_true')
     parser.set_defaults(test=False)
-    parser.set_defaults(mask=False)
     parser.set_defaults(distill=False)
+    parser.set_defaults(only_soft=False)
     args = parser.parse_args()
     return args
 
@@ -345,9 +314,9 @@ if __name__ == '__main__':
 
     # Prepare model
     if args.arch == 'posenet':
-        model = posenet.PoseNet(stages=args.stages, compute_mask=args.mask)
+        model = params['archs'][args.arch](stages=args.stages)
     else:
-        model = params['archs'][args.arch](compute_mask=args.mask)
+        model = params['archs'][args.arch]()
 
     if args.arch == 'posenet':
         posenet.copy_vgg_params(model)
@@ -421,15 +390,15 @@ if __name__ == '__main__':
         #     eval_loader, 1, repeat=False, shuffle=False)
 
     # Set up a trainer
-    updater = Updater(train_iter, model, teacher, optimizer, args.mask, device=args.gpu)
+    updater = Updater(train_iter, model, teacher, optimizer, device=args.gpu)
     trainer = training.Trainer(updater, (args.iteration, 'iteration'), args.out)
 
     val_interval = (10 if args.test else 1000), 'iteration'
     log_interval = (1 if args.test else 20), 'iteration'
 
-    trainer.extend(Validator(val_iter, model, teacher, args.mask, device=args.gpu),
+    trainer.extend(Validator(val_iter, model, teacher, device=args.gpu),
                    trigger=val_interval)
-    # trainer.extend(Evaluator(coco_val, eval_iter, model, args.mask, device=args.gpu),
+    # trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
     #                trigger=val_interval)
     # trainer.extend(extensions.dump_graph('main/loss'))
     trainer.extend(extensions.snapshot(), trigger=val_interval)
@@ -438,7 +407,7 @@ if __name__ == '__main__':
     trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
-        'main/heat', 'val/heat',# 'main/mask', 'val/mask', 'AP', 'AR'
+        'main/heat', 'val/heat',#'AP', 'AR'
     ]), trigger=log_interval)
     trainer.extend(extensions.ProgressBar(update_interval=1))
 

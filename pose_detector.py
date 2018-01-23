@@ -14,19 +14,18 @@ from models.CocoPoseNet import CocoPoseNet
 
 
 class PoseDetector(object):
-    def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False, compute_mask=False, stages=6):
+    def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False, stages=6):
         self.arch = arch
         self.precise = precise
-        self.compute_mask = compute_mask
         if model is not None:
             self.model = model
         else:
             # Load model
             print('Loading the model...')
             if arch == 'posenet':
-                self.model = params['archs'][arch](stages=stages, compute_mask=compute_mask)
+                self.model = params['archs'][arch](stages=stages)
             else:
-                self.model = params['archs'][arch](compute_mask=compute_mask)
+                self.model = params['archs'][arch]()
 
             if weights_file:
                 serializers.load_npz(weights_file, self.model)
@@ -87,7 +86,7 @@ class PoseDetector(object):
             all_peaks = []
             peak_counter = 0
             for i , heatmap in enumerate(heatmaps):
-                # heatmap = gaussian_filter(heatmap, sigma=params['gaussian_sigma'])
+                heatmap = gaussian_filter(heatmap, sigma=params['gaussian_sigma'])
                 map_left = xp.zeros(heatmap.shape)
                 map_right = xp.zeros(heatmap.shape)
                 map_top = xp.zeros(heatmap.shape)
@@ -97,11 +96,19 @@ class PoseDetector(object):
                 map_top[:, 1:] = heatmap[:, :-1]
                 map_bottom[:, :-1] = heatmap[:, 1:]
 
-                peaks_binary = xp.logical_and.reduce((heatmap >= map_left, heatmap >= map_right, heatmap >= map_top, heatmap >= map_bottom, heatmap > params['heatmap_peak_thresh']))
+                peaks_binary = xp.logical_and.reduce((
+                    heatmap >= map_left,
+                    heatmap >= map_right,
+                    heatmap >= map_top,
+                    heatmap >= map_bottom,
+                    heatmap > params['heatmap_peak_thresh']
+                ))
                 peaks = zip(xp.nonzero(peaks_binary)[1], xp.nonzero(peaks_binary)[0]) # [(x, y), (x, y)...]のpeak座標配列
-                peaks_with_score = [(i,) + peak_pos + (heatmap[peak_pos[1], peak_pos[0]],) for peak_pos in peaks] # [(x, y, score), (x, y, score)...]のpeak配列 scoreはheatmap上のscore
+                # [(x, y, score), (x, y, score)...]のpeak配列 scoreはheatmap上のscore
+                peaks_with_score = [(i,) + peak_pos + (heatmap[peak_pos[1], peak_pos[0]],) for peak_pos in peaks]
                 peaks_id = range(peak_counter, peak_counter + len(peaks_with_score))
-                peaks_with_score_and_id = [peaks_with_score[i] + (peaks_id[i], ) for i in range(len(peaks_id))] # [(x, y, score, id), (x, y, score, id)...]のpeak配列
+                # [(x, y, score, id), (x, y, score, id)...]のpeak配列
+                peaks_with_score_and_id = [peaks_with_score[i] + (peaks_id[i], ) for i in range(len(peaks_id))]
                 peak_counter += len(peaks_with_score_and_id)
                 all_peaks.append(peaks_with_score_and_id)
             all_peaks = xp.array([peak for peaks_each_category in all_peaks for peak in peaks_each_category])
@@ -671,10 +678,7 @@ class PoseDetector(object):
             if self.device >= 0:
                 x_data = cuda.to_gpu(x_data)
 
-            if self.compute_mask:
-                h1s, h2s, _ = self.model(x_data)
-            else:
-                h1s, h2s = self.model(x_data)
+            h1s, h2s = self.model(x_data)
 
             tmp_paf = h1s[-1][0].data.transpose(1, 2, 0)
             tmp_heatmap = h2s[-1][0].data.transpose(1, 2, 0)
@@ -761,10 +765,7 @@ class PoseDetector(object):
             if self.device >= 0:
                 x_data = cuda.to_gpu(x_data)
 
-            if self.compute_mask:
-                h1s, h2s, _ = self.model(x_data)
-            else:
-                h1s, h2s = self.model(x_data)
+            h1s, h2s = self.model(x_data)
 
             pafs_sum += F.resize_images(h1s[-1], (resized_output_img_h, resized_output_img_w)).data[0]
             heatmaps_sum += F.resize_images(h2s[-1], (resized_output_img_h, resized_output_img_w)).data[0]
@@ -831,7 +832,6 @@ if __name__ == '__main__':
     parser.add_argument('--img', '-i', default=None, help='image file path')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--stages', '-s', type=int, default=6, help='number of posenet stages')
-    parser.add_argument('--mask', action='store_true')
     parser.add_argument('--precise', action='store_true', help='visualize results')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
@@ -842,7 +842,7 @@ if __name__ == '__main__':
     chainer.config.train = False
 
     # load model
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask, stages=args.stages)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
 
     # while True:
     for i in range(20):

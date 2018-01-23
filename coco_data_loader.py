@@ -6,6 +6,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
+
 from chainer.dataset import DatasetMixin
 from pycocotools.coco import COCO
 
@@ -60,16 +61,6 @@ class CocoDataLoader(DatasetMixin):
         img = img * np.repeat((ignore_mask == 0).astype(np.uint8)[:, :, None], 3, axis=2)
         return img
 
-    def overlay_stuff_mask(self, img, stuff_mask, n_class):
-        hue = stuff_mask / (n_class - 1)
-        saturation = np.ones_like(hue)
-        value = saturation.copy()
-        value[stuff_mask == -1] = 0
-        hsv_stuff_mask = np.vstack((hue[None], saturation[None], value[None])).transpose(1, 2, 0)
-        rgb_hsv_stuff_mask = cv2.cvtColor((hsv_stuff_mask * 255).astype(np.uint8), cv2.COLOR_HSV2BGR)
-        img = cv2.addWeighted(img, 0.4, rgb_hsv_stuff_mask, 0.6, 0)
-        return img
-
     def get_pose_bboxes(self, poses):
         pose_bboxes = []
         for pose in poses:
@@ -79,21 +70,18 @@ class CocoDataLoader(DatasetMixin):
             y2 = pose[pose[:, 2] > 0][:, 1].max()
             pose_bboxes.append([x1, y1, x2, y2])
         pose_bboxes = np.array(pose_bboxes)
-        # for x1, y1, x2, y2 in pose_bboxes:  # draw joint bboxes
-        #     cv2.rectangle(orig_img, (x1, y1), (x2, y2), (0, 255, 0), 1)
         return pose_bboxes
 
-    def resize_data(self, img, ignore_mask, poses, stuff_mask, shape):
-        """resize img and mask"""
+    def resize_data(self, img, ignore_mask, poses, shape):
+        """resize img, mask and annotations"""
         img_h, img_w, _ = img.shape
 
         resized_img = cv2.resize(img, shape)
         ignore_mask = cv2.resize(ignore_mask.astype(np.uint8), shape).astype('bool')
         poses[:, :, :2] = (poses[:, :, :2] * np.array(shape) / np.array((img_w, img_h)))
-        stuff_mask = cv2.resize(stuff_mask, shape, interpolation=cv2.INTER_NEAREST)
-        return resized_img, ignore_mask, poses, stuff_mask
+        return resized_img, ignore_mask, poses
 
-    def random_resize_img(self, img, ignore_mask, stuff_mask, poses):
+    def random_resize_img(self, img, ignore_mask, poses):
         h, w, _ = img.shape
         joint_bboxes = self.get_pose_bboxes(poses)
         bbox_sizes = ((joint_bboxes[:, 2:] - joint_bboxes[:, :2] + 1)**2).sum(axis=1)**0.5
@@ -114,10 +102,10 @@ class CocoDataLoader(DatasetMixin):
 
         # print(scale)
 
-        resized_img, resized_mask, resized_poses, resized_stuff = self.resize_data(img, ignore_mask, poses, stuff_mask, shape)
-        return resized_img, resized_mask, resized_stuff, poses
+        resized_img, resized_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape)
+        return resized_img, resized_mask, poses
 
-    def random_rotate_img(self, img, mask, stuff_mask, poses):
+    def random_rotate_img(self, img, mask, poses):
         h, w, _ = img.shape
         # degree = (random.random() - 0.5) * 2 * params['max_rotate_degree']
         degree = np.random.randn() / 3 * params['max_rotate_degree']
@@ -127,18 +115,18 @@ class CocoDataLoader(DatasetMixin):
         bbox = (w*abs(math.cos(rad)) + h*abs(math.sin(rad)), w*abs(math.sin(rad)) + h*abs(math.cos(rad)))
         R[0, 2] += bbox[0] / 2 - center[0]
         R[1, 2] += bbox[1] / 2 - center[1]
-        rotate_img = cv2.warpAffine(img, R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(104, 117, 123))
+        rotate_img = cv2.warpAffine(img, R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_CUBIC,
+                                    borderMode=cv2.BORDER_CONSTANT, borderValue=(104, 117, 123))
         rotate_mask = cv2.warpAffine(mask.astype('uint8')*255, R, (int(bbox[0]+0.5), int(bbox[1]+0.5))) > 0
-        rotate_stuff_mask = cv2.warpAffine(stuff_mask, R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_NEAREST)
 
         tmp_poses = np.ones_like(poses)
         tmp_poses[:, :, :2] = poses[:, :, :2].copy()
         tmp_rotate_poses = np.dot(tmp_poses, R.T)  # apply rotation matrix to the poses
         rotate_poses = poses.copy()  # to keep visibility flag
         rotate_poses[:, :, :2] = tmp_rotate_poses
-        return rotate_img, rotate_mask, rotate_stuff_mask, rotate_poses
+        return rotate_img, rotate_mask, rotate_poses
 
-    def random_crop_img(self, img, ignore_mask, stuff_mask, poses):
+    def random_crop_img(self, img, ignore_mask, poses):
         h, w, _ = img.shape
         insize = self.insize
         joint_bboxes = self.get_pose_bboxes(poses)
@@ -151,7 +139,6 @@ class CocoDataLoader(DatasetMixin):
 
         crop_img = np.zeros((insize, insize, 3), 'uint8') + (104, 117, 123)
         crop_mask = np.zeros((insize, insize), 'bool')
-        crop_stuff = np.zeros((insize, insize), 'int32')
 
         offset = (center - (insize-1)/2 + 0.5).astype('i')
         offset_ = (center + (insize-1)/2 - (w-1, h-1) + 0.5).astype('i')
@@ -171,12 +158,10 @@ class CocoDataLoader(DatasetMixin):
 
         crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
         crop_mask[y_from:y_to+1, x_from:x_to+1] = ignore_mask[y1:y2+1, x1:x2+1].copy()
-        crop_stuff[y_from:y_to+1, x_from:x_to+1] = stuff_mask[y1:y2+1, x1:x2+1].copy()
 
         poses[:, :, :2] -= offset
-        return crop_img.astype('uint8'), crop_mask, crop_stuff, poses
+        return crop_img.astype('uint8'), crop_mask, poses
 
-    # distort image color
     def distort_color(self, img):
         img_max = np.broadcast_to(np.array(255, dtype=np.uint8), img.shape[:-1])
         img_min = np.zeros(img.shape[:-1], dtype=np.uint8)
@@ -190,10 +175,9 @@ class CocoDataLoader(DatasetMixin):
         distorted_img = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2BGR)
         return distorted_img
 
-    def flip_img(self, img, mask, stuff_mask, poses):
+    def flip_img(self, img, mask, poses):
         flipped_img = cv2.flip(img, 1)
         flipped_mask = cv2.flip(mask.astype(np.uint8), 1).astype('bool')
-        stuff_mask = cv2.flip(stuff_mask, 1)
         poses[:, :, 0] = img.shape[1] - 1 - poses[:, :, 0]
 
         def swap_joints(poses, joint_type_1, joint_type_2):
@@ -209,30 +193,25 @@ class CocoDataLoader(DatasetMixin):
         swap_joints(poses, JointType.LeftWaist, JointType.RightWaist)
         swap_joints(poses, JointType.LeftKnee, JointType.RightKnee)
         swap_joints(poses, JointType.LeftFoot, JointType.RightFoot)
-        return flipped_img, flipped_mask, stuff_mask, poses
+        return flipped_img, flipped_mask, poses
 
-    def augment_data(self, orig_img, ignore_mask, poses, stuff_mask):
-        # TODO: need visialisation for debug
-        aug_img = orig_img.copy()
-        aug_img, ignore_mask, stuff_mask, poses = self.random_resize_img(
-            aug_img, ignore_mask, stuff_mask, poses)
-        aug_img, ignore_mask, stuff_mask, poses = self.random_rotate_img(
-            aug_img, ignore_mask, stuff_mask, poses)
-        aug_img, ignore_mask, stuff_mask, poses = self.random_crop_img(
-            aug_img, ignore_mask, stuff_mask, poses)
-
-        aug_img = self.distort_color(aug_img)
-
+    def augment_data(self, img, ignore_mask, poses):
+        aug_img = img.copy()
+        aug_img, ignore_mask, poses = self.random_resize_img(aug_img, ignore_mask, poses)
+        aug_img, ignore_mask, poses = self.random_rotate_img(aug_img, ignore_mask, poses)
+        aug_img, ignore_mask, poses = self.random_crop_img(aug_img, ignore_mask, poses)
         if np.random.randint(2):
-            aug_img, ignore_mask, stuff_mask, poses = self.flip_img(aug_img, ignore_mask, stuff_mask, poses)
+            aug_img = self.distort_color(aug_img)
+        if np.random.randint(2):
+            aug_img, ignore_mask, poses = self.flip_img(aug_img, ignore_mask, poses)
 
-        return aug_img, ignore_mask, poses, stuff_mask
+        return aug_img, ignore_mask, poses
 
     # return shape: (height, width)
-    def generate_gaussian_heatmap(self, imshape, joint, sigma):
+    def generate_gaussian_heatmap(self, shape, joint, sigma):
         x, y = joint
-        grid_x = np.tile(np.arange(imshape[1]), (imshape[0], 1))
-        grid_y = np.tile(np.arange(imshape[0]), (imshape[1], 1)).transpose()
+        grid_x = np.tile(np.arange(shape[1]), (shape[0], 1))
+        grid_y = np.tile(np.arange(shape[0]), (shape[1], 1)).transpose()
         grid_distance = (grid_x - x) ** 2 + (grid_y - y) ** 2
         gaussian_heatmap = np.exp(-0.5 * grid_distance / sigma**2)
         return gaussian_heatmap
@@ -253,23 +232,23 @@ class CocoDataLoader(DatasetMixin):
         return heatmaps.astype('f')
 
     # return shape: (2, height, width)
-    def generate_constant_paf(self, imshape, joint_from, joint_to, paf_width):
+    def generate_constant_paf(self, shape, joint_from, joint_to, paf_width):
         if np.array_equal(joint_from, joint_to): # same joint
-            return np.zeros((2,) + imshape[:-1])
+            return np.zeros((2,) + shape[:-1])
 
         joint_distance = np.linalg.norm(joint_to - joint_from)
         unit_vector = (joint_to - joint_from) / joint_distance
         rad = np.pi / 2
         rot_matrix = np.array([[np.cos(rad), np.sin(rad)], [-np.sin(rad), np.cos(rad)]])
         vertical_unit_vector = np.dot(rot_matrix, unit_vector)
-        grid_x = np.tile(np.arange(imshape[1]), (imshape[0], 1))
-        grid_y = np.tile(np.arange(imshape[0]), (imshape[1], 1)).transpose()
+        grid_x = np.tile(np.arange(shape[1]), (shape[0], 1))
+        grid_y = np.tile(np.arange(shape[0]), (shape[1], 1)).transpose()
         horizontal_inner_product = unit_vector[0] * (grid_x - joint_from[0]) + unit_vector[1] * (grid_y - joint_from[1])
         horizontal_paf_flag = (0 <= horizontal_inner_product) & (horizontal_inner_product <= joint_distance)
         vertical_inner_product = vertical_unit_vector[0] * (grid_x - joint_from[0]) + vertical_unit_vector[1] * (grid_y - joint_from[1])
         vertical_paf_flag = np.abs(vertical_inner_product) <= paf_width
         paf_flag = horizontal_paf_flag & vertical_paf_flag
-        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, imshape[:-1] + (2,)).transpose(2, 0, 1)
+        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape[:-1] + (2,)).transpose(2, 0, 1)
         return constant_paf
 
     def generate_pafs(self, img, poses, paf_sigma):
@@ -328,17 +307,9 @@ class CocoDataLoader(DatasetMixin):
         else:
             ignore_mask = ignore_mask == 255
 
-        masks = np.ones(img.shape[:2], 'uint8')
-        for ann in annotations_for_img:
-            mask = self.coco.annToMask(ann)
-            if ann['iscrowd'] == 1:
-                masks[mask == 1] = 0
-            else:
-                masks[mask == 1] = 2
-
         if self.mode == 'eval':
-            return img, img_id, annotations_for_img, ignore_mask, masks
-        return img, img_id, annotations, ignore_mask, masks
+            return img, img_id, annotations_for_img, ignore_mask
+        return img, img_id, annotations, ignore_mask
 
     def parse_coco_annotation(self, annotations):
         """coco annotation dataのアノテーションをposes配列に変換"""
@@ -361,21 +332,19 @@ class CocoDataLoader(DatasetMixin):
             poses = np.vstack((poses, pose))
 
         gt_pose = np.array(ann['keypoints']).reshape(-1, 3)
-
         return poses
 
-    def generate_labels(self, img, poses, ignore_mask, stuff_mask):
-        stuff_mask = stuff_mask.astype('i') - 1
-        img, ignore_mask, poses, stuff_mask = self.augment_data(img, ignore_mask, poses, stuff_mask)
-        resized_img, ignore_mask, resized_poses, resized_stuff = self.resize_data(img, ignore_mask, poses, stuff_mask, shape=(self.insize, self.insize))
+    def generate_labels(self, img, poses, ignore_mask):
+        img, ignore_mask, poses = self.augment_data(img, ignore_mask, poses)
+        resized_img, ignore_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape=(self.insize, self.insize))
 
         heatmaps = self.generate_heatmaps(resized_img, resized_poses, params['heatmap_sigma'])
         pafs = self.generate_pafs(resized_img, resized_poses, params['paf_sigma'])
         ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
-        return resized_img, pafs, heatmaps, ignore_mask, resized_stuff
+        return resized_img, pafs, heatmaps, ignore_mask
 
     def get_example(self, i):
-        img, img_id, annotations, ignore_mask, stuff_mask = self.get_img_annotation(ind=i)
+        img, img_id, annotations, ignore_mask = self.get_img_annotation(ind=i)
 
         if self.mode == 'eval':
             # don't need to make heatmaps/pafs
@@ -384,11 +353,11 @@ class CocoDataLoader(DatasetMixin):
         # if no annotations are available
         while annotations is None:
             img_id = self.imgIds[np.random.randint(len(self))]
-            img, img_id, annotations, ignore_mask, stuff_mask = self.get_img_annotation(img_id=img_id)
+            img, img_id, annotations, ignore_mask = self.get_img_annotation(img_id=img_id)
 
         poses = self.parse_coco_annotation(annotations)
-        resized_img, pafs, heatmaps, ignore_mask, stuff_mask = self.generate_labels(img, poses, ignore_mask, stuff_mask)
-        return resized_img, pafs, heatmaps, ignore_mask, stuff_mask
+        resized_img, pafs, heatmaps, ignore_mask = self.generate_labels(img, poses, ignore_mask)
+        return resized_img, pafs, heatmaps, ignore_mask
 
 if __name__ == '__main__':
     mode = 'train'
@@ -398,28 +367,26 @@ if __name__ == '__main__':
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
     for i in range(len(data_loader)):
-        orig_img, img_id, annotations, ignore_mask, stuff_mask = data_loader.get_img_annotation(ind=np.random.randint(len(data_loader)))
+        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
         if annotations is not None:
             poses = data_loader.parse_coco_annotation(annotations)
-            resized_img, pafs, heatmaps, ignore_mask, stuff_mask = data_loader.generate_labels(orig_img, poses, ignore_mask, stuff_mask)
+            resized_img, pafs, heatmaps, ignore_mask = data_loader.generate_labels(img, poses, ignore_mask)
 
             # resize to view
             shape = (params['insize'],) * 2
             pafs = cv2.resize(pafs.transpose(1, 2, 0), shape).transpose(2, 0, 1)
             heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape).transpose(2, 0, 1)
             ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape) > 0
-            stuff_mask = cv2.resize(stuff_mask, shape, interpolation=cv2.INTER_NEAREST)
 
-            # view
-            img = resized_img.copy()
-            img = data_loader.overlay_pafs(img, pafs)
-            img = data_loader.overlay_heatmap(img, heatmaps[:-1].max(axis=0))
-            img = data_loader.overlay_ignore_mask(img, ignore_mask)
-            # img = data_loader.overlay_stuff_mask(img, stuff_mask, n_class=3)
+            # overlay labels
+            img_to_show = resized_img.copy()
+            img_to_show = data_loader.overlay_pafs(img_to_show, pafs)
+            img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:-1].max(axis=0))
+            img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask)
 
-            cv2.imshow('w', np.hstack((resized_img, img)))
+            cv2.imshow('w', np.hstack((resized_img, img_to_show)))
             k = cv2.waitKey(0)
             if k == ord('q'):
                 sys.exit()
-            if k == ord('d'):
+            elif k == ord('d'):
                 import ipdb; ipdb.set_trace()
