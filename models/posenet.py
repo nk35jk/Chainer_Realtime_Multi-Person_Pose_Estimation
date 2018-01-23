@@ -148,6 +148,6 @@ if __name__ == '__main__':
     h1s, h2s = model(arr)
 
     import chainer.computational_graph as c
-    g = c.build_computational_graph([h1s[-1], h2s[-1])
+    g = c.build_computational_graph([h1s[-1], h2s[-1]])
     with open('graph.dot', 'w') as o:
         o.write(g.dump())
