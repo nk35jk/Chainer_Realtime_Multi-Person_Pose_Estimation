@@ -24,7 +24,7 @@ class PoseDetector(object):
             # Load model
             print('Loading the model...')
             if arch == 'posenet':
-                self.model = posenet.PoseNet(stages=stages, compute_mask=compute_mask)
+                self.model = params['archs'][arch](stages=stages, compute_mask=compute_mask)
             else:
                 self.model = params['archs'][arch](compute_mask=compute_mask)
 
