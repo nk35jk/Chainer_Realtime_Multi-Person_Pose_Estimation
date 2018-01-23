@@ -106,7 +106,7 @@ class CPN(chainer.Chain):
     downscale = 4
     pad = 32
 
-    def __init__(self, joints=19, limbs=38, compute_mask=False):
+    def __init__(self, joints=19, limbs=38):
         super(CPN, self).__init__()
         self.joints = joints
         self.limbs = limbs

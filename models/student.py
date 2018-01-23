@@ -79,7 +79,7 @@ class Student(chainer.Chain):
     downscale = 8
     pad = downscale
 
-    def __init__(self, joints=19, limbs=38, compute_mask=False):
+    def __init__(self, joints=19, limbs=38):
         super(Student, self).__init__()
         with self.init_scope():
             self.squeeze = SqueezeNet(res=True)

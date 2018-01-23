@@ -110,7 +110,7 @@ class PSPNet(chainer.Chain):
     insize = 384
     downscale = pad = 8
 
-    def __init__(self, joints=19, limbs=38, compute_mask=False):
+    def __init__(self, joints=19, limbs=38):
         super(PSPNet, self).__init__()
         self.joints = joints
         self.limbs = limbs

@@ -46,7 +46,7 @@ class Objective(object):
     def __init__(self, path):
         self.coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
         self.eval_loader = CocoDataLoader(self.coco_val, params['inference_img_size'], mode='eval', n_samples=None)
-        self.pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, compute_mask=args.mask, stages=args.stages)
+        self.pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
         self.path = path
 
     def __call__(self, p):

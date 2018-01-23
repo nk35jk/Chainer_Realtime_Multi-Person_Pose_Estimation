@@ -106,7 +106,7 @@ class ResNetFPN(chainer.Chain):
     downscale = 4
     pad = 32
 
-    def __init__(self, joints=19, limbs=38, compute_mask=False):
+    def __init__(self, joints=19, limbs=38):
         super(ResNetFPN, self).__init__()
         with self.init_scope():
             self.res = ResNet()

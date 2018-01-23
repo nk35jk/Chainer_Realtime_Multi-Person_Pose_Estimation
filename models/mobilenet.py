@@ -29,7 +29,7 @@ class MobileNet(chainer.Chain):
     mean = [103.94,116.78,123.68]
     scale = 0.017
 
-    def __init__(self, joints=19, limbs=38, compute_mask=False):
+    def __init__(self, joints=19, limbs=38):
         super(MobileNet, self).__init__()
         self.joints = joints
         self.limbs = limbs
