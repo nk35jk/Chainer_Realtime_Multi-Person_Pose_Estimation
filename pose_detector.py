@@ -562,8 +562,8 @@ class PoseDetector(object):
 
         h1s, h2s = self.model(x_data)
 
-        pafs += F.resize_images(h1s[-1], (map_h, map_w)).data[0]
-        heatmaps += F.resize_images(h2s[-1], (map_h, map_w)).data[0]
+        pafs = F.resize_images(h1s[-1], (map_h, map_w)).data[0]
+        heatmaps = F.resize_images(h2s[-1], (map_h, map_w)).data[0]
 
         if self.device >= 0:
             pafs = pafs.get()
