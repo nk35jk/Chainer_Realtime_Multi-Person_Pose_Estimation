@@ -20,7 +20,6 @@ class PoseDetector(object):
         if model is not None:
             self.model = model
         else:
-            # Load model
             print('Loading the model...')
             if arch == 'posenet':
                 self.model = params['archs'][arch](stages=stages)
@@ -52,15 +51,15 @@ class PoseDetector(object):
         h, w, _ = img.shape
 
         pad = [0] * 2
-        pad[0] = (stride - (h % stride)) % stride # down
-        pad[1] = (stride - (w % stride)) % stride # right
+        pad[0] = (stride - (h % stride)) % stride  # down
+        pad[1] = (stride - (w % stride)) % stride  # right
 
         img_padded = np.zeros((h+pad[0], w+pad[1], 3), 'uint8') + pad_value
         img_padded[:h, :w, :] = img.copy()
         return img_padded, pad
 
     def compute_optimal_size(self, orig_img, img_size, stride=8):
-        """画像のサイズが幅と高さがstrideの倍数になるように調節する"""
+        """画像の幅と高さがstrideの倍数になるように調節する"""
         orig_img_h, orig_img_w, _ = orig_img.shape
         aspect = orig_img_h / orig_img_w
         if orig_img_h < orig_img_w:
@@ -78,6 +77,8 @@ class PoseDetector(object):
         return (img_w, img_h)
 
     def compute_peaks_from_heatmaps(self, heatmaps):
+        """all_peaks: shape = [N, 5], column = (jointtype, x, y, score, index)"""
+
         heatmaps = heatmaps[:-1]
 
         xp = cuda.get_array_module(heatmaps)
@@ -97,17 +98,16 @@ class PoseDetector(object):
                 map_bottom[:, :-1] = heatmap[:, 1:]
 
                 peaks_binary = xp.logical_and.reduce((
-                    heatmap >= map_left,
-                    heatmap >= map_right,
-                    heatmap >= map_top,
-                    heatmap >= map_bottom,
-                    heatmap > params['heatmap_peak_thresh']
+                    heatmap > params['heatmap_peak_thresh'],
+                    heatmap > map_left,
+                    heatmap > map_right,
+                    heatmap > map_top,
+                    heatmap > map_bottom,
                 ))
-                peaks = zip(xp.nonzero(peaks_binary)[1], xp.nonzero(peaks_binary)[0]) # [(x, y), (x, y)...]のpeak座標配列
-                # [(x, y, score), (x, y, score)...]のpeak配列 scoreはheatmap上のscore
+
+                peaks = zip(xp.nonzero(peaks_binary)[1], xp.nonzero(peaks_binary)[0])  # [(x, y), (x, y)...]のpeak座標配列
                 peaks_with_score = [(i,) + peak_pos + (heatmap[peak_pos[1], peak_pos[0]],) for peak_pos in peaks]
                 peaks_id = range(peak_counter, peak_counter + len(peaks_with_score))
-                # [(x, y, score, id), (x, y, score, id)...]のpeak配列
                 peaks_with_score_and_id = [peaks_with_score[i] + (peaks_id[i], ) for i in range(len(peaks_id))]
                 peak_counter += len(peaks_with_score_and_id)
                 all_peaks.append(peaks_with_score_and_id)
@@ -123,7 +123,7 @@ class PoseDetector(object):
             top_heatmaps[:, :, 1:] = heatmaps[:, :, :-1]
             bottom_heatmaps[:, :, :-1] = heatmaps[:, :, 1:]
 
-            peaks_binary = xp.logical_and(heatmaps >= params['heatmap_peak_thresh'], heatmaps >= right_heatmaps)
+            peaks_binary = xp.logical_and(heatmaps > params['heatmap_peak_thresh'], heatmaps >= right_heatmaps)
             peaks_binary = xp.logical_and(peaks_binary, heatmaps >= top_heatmaps)
             peaks_binary = xp.logical_and(peaks_binary, heatmaps >= left_heatmaps)
             peaks_binary = xp.logical_and(peaks_binary, heatmaps >= bottom_heatmaps)
@@ -291,180 +291,6 @@ class PoseDetector(object):
         keep = np.logical_and(subsets[:, -1] >= params['n_subset_limbs_thresh'], subsets[:, -2]/subsets[:, -1] >= params['subset_score_thresh'])
         subsets = subsets[keep]
         return subsets
-
-    def compute_candidate_connections2(self, paf, cand_a, cand_b, img_len, params):
-
-        candidate_connections = []
-        for i, joint_a in enumerate(cand_a):
-            for j, joint_b in enumerate(cand_b):  # jointは(x, y)座標
-                vector = joint_b[:2] - joint_a[:2]
-                norm = np.linalg.norm(vector)
-                if norm == 0:
-                    continue
-
-                ys = np.linspace(joint_a[1], joint_b[1], num=params['n_integ_points'])
-                xs = np.linspace(joint_a[0], joint_b[0], num=params['n_integ_points'])
-                integ_points = np.stack([ys, xs]).T.round().astype('i')  # joint_aとjoint_bの2点間を結ぶ線分上の座標点 [[x1, y1], [x2, y2]...]
-                paf_in_edge = np.hstack([paf[0][np.hsplit(integ_points, 2)], paf[1][np.hsplit(integ_points, 2)]])
-                unit_vector = vector / norm
-                inner_products = np.dot(paf_in_edge, unit_vector)
-
-                integ_value = inner_products.sum() / len(inner_products)
-                # vectorの長さが基準値以上の時にペナルティを与える
-                integ_value_with_dist_prior = integ_value + min(params['limb_length_ratio'] * img_len / norm - params['length_penalty_value'], 0)
-
-                n_valid_points = sum(inner_products > params['inner_product_thresh'])
-                if n_valid_points > params['n_integ_points_thresh'] and integ_value_with_dist_prior > 0:
-                    candidate_connections.append([i, j, integ_value_with_dist_prior])
-        candidate_connections = sorted(candidate_connections, key=lambda x: x[2], reverse=True)
-
-        return candidate_connections
-
-    def compute_subsets(self, pafs, all_peaks, orig_img_h, params):
-        candidates = all_peaks[:, 1:]
-
-        kpt_num = 18 + 2
-
-        limbSeq = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10],
-                   [10,11], [2,12], [12,13], [13,14], [2,1], [1,15], [15,17],
-                   [1,16], [16,18], [3,17], [6,18]]
-        limbSeq = np.array(limbSeq) - 1
-
-        mapIdx = [[31,32], [39,40], [33,34], [35,36], [41,42], [43,44], [19,20], [21,22],
-                  [23,24], [25,26], [27,28], [29,30], [47,48], [49,50], [53,54], [51,52],
-                  [55,56], [37,38], [45,46]]
-
-        subset = np.zeros((0, kpt_num))
-
-        for k in range(len(mapIdx)):
-            score_mid = pafs[[x - 19 for x in mapIdx[k]]]
-
-            candA = all_peaks[all_peaks[:, 0] == limbSeq[k][0]][:, 1:]
-            candB = all_peaks[all_peaks[:, 0] == limbSeq[k][1]][:, 1:]
-
-            connection = []
-
-            nA = len(candA)
-            nB = len(candB)
-            indexA = limbSeq[k][0]
-            indexB = limbSeq[k][1]
-
-            if nA == 0 and nB == 0:
-                continue
-            elif nA == 0:
-                for i in range(nB):
-                    num = 0
-                    for j in range(len(subset)):
-                        if subset[j, indexB] == candB[i, 3]:
-                            num += 1
-                            continue
-
-                    # if find no partB in the subset, create a new subset
-                    if num == 0:
-                        # subset.append([0] * kpt_num)
-                        subset = np.vstack([subset, np.zeros(kpt_num)-1])
-                        subset[-1][indexB] = candB[i, 3]
-                        subset[-1][-1] = 1
-                        subset[-1][-2] = candB[i, 2]
-                continue
-            elif nB == 0:
-                for i in range(nA):
-                    num = 0
-                    for j in range(len(subset)):
-                        if subset[j, indexA] == candA[i, 3]:
-                            num += 1
-                            continue
-
-                    # if find no partA in the subset, create a new subset
-                    if num == 0:
-                        # subset.append([0] * kpt_num)
-                        subset = np.vstack([subset, np.zeros(kpt_num)-1])
-                        subset[-1][indexA] = candA[i, 3]
-                        subset[-1][-1] = 1
-                        subset[-1][-2] = candA[i, 2]
-                continue
-
-            temp = self.compute_candidate_connections2(score_mid, candA, candB, orig_img_h/2, params)
-
-            # select the top num connection, assuming that each part occur only once
-            # sort rows in descending order
-            if len(temp) > 0:
-                temp = sorted(temp, key=lambda x:x[2], reverse=True)
-            # set the conection number as the smaller parts set number
-            num = min(nA, nB)
-            cnt = 0
-            occurA = [0] * nA
-            occurB = [0] * nB
-
-            for row in range(len(temp)):
-                if cnt == num:
-                    break
-                else:
-                    i = temp[row][0]
-                    j = temp[row][1]
-                    score = temp[row][2]
-                    if occurA[i] == 0 and occurB[j] == 0:
-                        connection.append([candA[i, 3], candB[j, 3], score])
-                        cnt += 1
-                        occurA[i] = 1
-                        occurB[j] = 1
-
-            # cluster all the joints candidates into subset based on the part connection
-            temp = np.array(connection)
-            if len(temp) == 0:
-                continue
-
-            # initialize first body part connection 15&16
-            if k == 0:
-                subset = np.zeros((len(temp), kpt_num))
-                for i in range(len(temp)):
-                    subset[i, limbSeq[0]] = temp[i, 0:2]
-                    subset[i, -1] = 2
-                    # add the score of parts and the connection
-                    subset[i, -2] = sum(candidates[temp[i, :2].astype('i'), 2]) + temp[i, 2]
-            elif k == 17 or k == 18:
-                # add 15 16 connection
-                partA = temp[:, 0]
-                partB = temp[:, 1]
-                indexA = limbSeq[k, 0]
-                indexB = limbSeq[k, 1]
-
-                for i in range(len(temp)):
-                    for j in range(len(subset)):
-                        if subset[j, indexA] == partA[i] and subset[j, indexB] == 0:
-                            subset[j, indexB] = partB[i]
-                        elif subset[j, indexB] == partB[i] and subset[j, indexA] == 0:
-                            subset[j, indexA] = partA[i]
-                continue
-            else:
-                # partA is already in the subset, find its connection partB
-                partA = temp[:, 0]
-                partB = temp[:, 1]
-                indexA = limbSeq[k, 0]
-                indexB = limbSeq[k, 1]
-
-                for i in range(len(temp)):
-                    num = 0
-                    for j in range(len(subset)):
-                        if subset[j, indexA] == partA[i]:
-                            subset[j, indexB] = partB[i]
-                            num += 1
-                            subset[j, -1] = subset[j, -1] + 1
-                            subset[j, -2] = subset[j, -2] + candidates[int(partB[i]), 2] + temp[i, 2]
-
-                    # if find no partA in the subset, create a new subset
-                    if num == 0:
-                        subset = np.vstack([subset, np.zeros(kpt_num)-1])
-                        subset[-1, indexA] = partA[i]
-                        subset[-1, indexB] = partB[i]
-                        subset[-1, -1] = 2
-                        subset[-1, -2] = sum(candidates[temp[i, :2].astype('i'), 2]) + temp[i, 2]
-
-        # delete low score subsets
-        keep = np.logical_and(subset[:, -1] >= params['n_subset_limbs_thresh'], subset[:, -2]/subset[:, -1] >= params['subset_score_thresh'])
-        subset = subset[keep]
-
-        return subset
 
     def subsets_to_pose_array(self, subsets, all_peaks):
         person_pose_array = []
@@ -656,7 +482,6 @@ class PoseDetector(object):
 
         pafs_sum = 0
         heatmaps_sum = 0
-        # use only the first scale on fast mode
 
         interpolation = cv2.INTER_CUBIC
 
@@ -667,12 +492,6 @@ class PoseDetector(object):
             img = cv2.resize(orig_img, (math.ceil(orig_img_w*multiplier), math.ceil(orig_img_h*multiplier)), interpolation=interpolation)
             bbox = (params['inference_img_size'], max(params['inference_img_size'], img.shape[1]))
             padded_img, pad = self.pad_image(img, params['pad'], (104, 117, 123))
-            #
-            # print('')
-            # print(img.shape)
-            # print(bbox)
-            # print(multiplier)
-            # print(padded_img.shape)
 
             x_data = self.preprocess(padded_img)
             if self.device >= 0:
@@ -715,29 +534,15 @@ class PoseDetector(object):
             # cuda.get_device_from_id(self.device).synchronize()
         # print('forward: {:.2f}s'.format(time.time() - st))
 
+        print(self.heatmaps.shape)
         self.all_peaks = self.compute_peaks_from_heatmaps(self.heatmaps)
+        print(self.heatmaps.shape)
         if len(self.all_peaks) == 0:
             return np.empty((0, len(JointType), 3)), np.empty(0)
         all_connections = self.compute_connections(self.pafs, self.all_peaks, orig_img_w, params)
         subsets = self.grouping_key_points(all_connections, self.all_peaks, params)
-        # subsets_ = self.compute_subsets(self.pafs, self.all_peaks, orig_img_h, params)
         poses = self.subsets_to_pose_array(subsets, self.all_peaks)
         scores = subsets[:, -2]
-
-        if self.device >= 0:
-            self.heatmaps = cuda.to_cpu(self.heatmaps)
-
-        # ### for debug
-        # print('Number of candidate peaks: {}'.format(len(self.all_peaks)))
-        # joint_colors = [
-        #     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0],
-        #     [85, 255, 0], [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255],
-        #     [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], [170, 0, 255],
-        #     [255, 0, 255], [255, 0, 170], [255, 0, 85]]
-        # for all_peak in self.all_peaks:
-        #     cv2.circle(orig_img, (int(all_peak[1]), int(all_peak[2])), 3, joint_colors[int(all_peak[0])], -1)
-        # cv2.imwrite('result/img/peaks_{:08d}.png'.format(img_id), orig_img)
-        # ###
         return poses, scores
 
     def __call__(self, orig_img):
