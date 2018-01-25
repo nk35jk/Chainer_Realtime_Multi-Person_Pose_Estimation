@@ -150,4 +150,4 @@ class MobileNet(chainer.Chain):
 if __name__ == '__main__':
     model = MobileNet()
     arr = np.random.rand(1, 3, 368, 368).astype('f')
-    y = model(arr)
+    h1s, h2s = model(arr)
