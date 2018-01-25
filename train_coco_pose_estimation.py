@@ -91,7 +91,7 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
             pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
             heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
 
-        if not args.distill:
+        if not args.distill or args.comp:
             total_loss += pafs_loss + heatmaps_loss
         else:
             """distillation"""
