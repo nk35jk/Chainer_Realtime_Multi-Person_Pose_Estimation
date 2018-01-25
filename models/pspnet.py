@@ -152,6 +152,9 @@ class PSPNet(chainer.Chain):
 
 
 if __name__ == '__main__':
+    chainer.config.enable_backprop = False
+    chainer.config.train = False
+
     model = PSPNet()
     arr = np.random.rand(1, 3, model.insize, model.insize).astype('f')
     h1s, h2s = model(arr)

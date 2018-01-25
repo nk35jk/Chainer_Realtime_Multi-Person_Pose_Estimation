@@ -148,6 +148,9 @@ class MobileNet(chainer.Chain):
         return pafs, heatmaps
 
 if __name__ == '__main__':
+    chainer.config.enable_backprop = False
+    chainer.config.train = False
+
     model = MobileNet()
     arr = np.random.rand(1, 3, 368, 368).astype('f')
     h1s, h2s = model(arr)

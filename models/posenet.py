@@ -139,8 +139,8 @@ class PoseNet(chainer.Chain):
 
 
 if __name__ == '__main__':
-    import time
-    import numpy as np
+    chainer.config.enable_backprop = False
+    chainer.config.train = False
 
     model = PoseNet()
     arr = np.random.rand(1, 3, model.insize, model.insize).astype('f')

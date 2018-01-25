@@ -188,6 +188,9 @@ class NN1(chainer.Chain):
         return y1s, y2s
 
 if __name__ == '__main__':
+    chainer.config.enable_backprop = False
+    chainer.config.train = False
+    
     model = NN1()
     arr = np.random.rand(1, 3, 368, 368).astype('f')
     st = time.time()
