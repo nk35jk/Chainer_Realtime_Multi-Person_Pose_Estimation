@@ -42,7 +42,7 @@ class GradientScaling(object):
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
-                 pt_pafs, pt_heatmaps, ignore_mask, device):
+                 pafs_teacher, heatmaps_teacher, ignore_mask, device):
     xp = cuda.get_array_module(imgs)
 
     heatmap_loss_log = []
@@ -66,6 +66,25 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
                 stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
 
+            if args.comp:
+                """hard targetとsoft targetで絶対値が大きい方を学習ラベルとしても用いる"""
+                pafs_t_mag = stage_pafs_t[:, ::2]**2 + stage_pafs_t[:, 1::2]**2
+                pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=1)
+                pafs_teacher_mag = pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2
+                pafs_teacher_mag = xp.repeat(pafs_teacher_mag, 2, axis=1)
+                stage_pafs_t[pafs_t_mag < pafs_teacher_mag] = pafs_teacher[pafs_t_mag < pafs_teacher_mag]
+
+                stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]] = heatmaps_teacher[:, :-1][stage_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]].copy()
+                stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]] = heatmaps_teacher[:, -1][stage_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]].copy()
+
+                # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
+                # plt.imshow(heatmaps_teacher[1, -1], vmin=0, vmax=1); plt.show()
+                # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
+                #
+                # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
+                # plt.imshow(pafs_teacher[1, 7], vmin=-1, vmax=1); plt.show()
+                # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
+
             stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
             stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
 
@@ -78,19 +97,19 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
             """distillation"""
             if args.modify:
                 # modify soft pafs
-                paf_norm = (pt_pafs[:, ::2]**2 + pt_pafs[:, 1::2]**2)
+                paf_norm = (pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2)
                 paf_norm_m = -(paf_norm - 1)**2 + 1
                 multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
-                pt_pafs_m = xp.repeat(multiplier, 2, axis=1) * pt_pafs
+                pafs_teacher_m = xp.repeat(multiplier, 2, axis=1) * pafs_teacher
                 # modify soft heatmaps
-                pt_heatmaps_m = -(pt_heatmaps - 1)**2 + 1
-                pt_heatmaps_m[:, -1] = pt_heatmaps[:, -1]**2
+                heatmaps_teacher_m = -(heatmaps_teacher - 1)**2 + 1
+                heatmaps_teacher_m[:, -1] = heatmaps_teacher[:, -1]**2
 
-                soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs_m)
-                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps_m)
+                soft_pafs_loss = F.mean_squared_error(pafs_y, pafs_teacher_m)
+                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, heatmaps_teacher_m)
             else:
-                soft_pafs_loss = F.mean_squared_error(pafs_y, pt_pafs)
-                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, pt_heatmaps)
+                soft_pafs_loss = F.mean_squared_error(pafs_y, pafs_teacher)
+                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, heatmaps_teacher)
 
             if args.only_soft:
                 total_loss += soft_pafs_loss + soft_heatmaps_loss
@@ -154,16 +173,16 @@ class Updater(StandardUpdater):
 
         pafs_ys, heatmaps_ys = optimizer.target(x_data)
 
-        pt_pafs = pt_heatmaps = None
+        pafs_teacher = heatmaps_teacher = None
         if self.teacher:
             x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
             h1s, h2s = self.teacher(x_data)
-            pt_pafs = h1s[-1].data
-            pt_heatmaps = h2s[-1].data
+            pafs_teacher = h1s[-1].data
+            heatmaps_teacher = h2s[-1].data
 
         loss, paf_loss_log, heatmap_loss_log = compute_loss(
-            imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pt_pafs,
-            pt_heatmaps, ignore_mask, self.device)
+            imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pafs_teacher,
+            heatmaps_teacher, ignore_mask, self.device)
 
         reporter.report({
             'main/loss': loss,
@@ -200,16 +219,16 @@ class Validator(extensions.Evaluator):
 
                     pafs_ys, heatmaps_ys = model(x_data)
 
-                    pt_pafs = pt_heatmaps = None
+                    pafs_teacher = heatmaps_teacher = None
                     if self.teacher:
                         x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
                         h1s, h2s = self.teacher(x_data)
-                        pt_pafs = h1s[-1].data
-                        pt_heatmaps = h2s[-1].data
+                        pafs_teacher = h1s[-1].data
+                        heatmaps_teacher = h2s[-1].data
 
                     loss, paf_loss_log, heatmap_loss_log = compute_loss(
-                        imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pt_pafs,
-                        pt_heatmaps, ignore_mask, self.device)
+                        imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pafs_teacher,
+                        heatmaps_teacher, ignore_mask, self.device)
 
                     observation['val/loss'] = cuda.to_cpu(loss.data)
                     observation['val/paf'] = sum(paf_loss_log)
@@ -303,10 +322,12 @@ def parse_args():
     parser.add_argument('--distill', action='store_true')
     parser.add_argument('--modify', action='store_true')
     parser.add_argument('--only_soft', action='store_true')
+    parser.add_argument('--comp', action='store_true')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
     parser.set_defaults(modify=False)
     parser.set_defaults(only_soft=False)
+    parser.set_defaults(comp=False)
     args = parser.parse_args()
     return args
 
