@@ -317,11 +317,11 @@ def parse_args():
                         help='number of posenet stages')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--distill', action='store_true')
-    parser.add_argument('--only_soft', action='store_true'
+    parser.add_argument('--only_soft', action='store_true',
                         help='Train student model with only soft target')
-    parser.add_argument('--comp', action='store_true'
+    parser.add_argument('--comp', action='store_true',
                         help='Complete label with output of teacher model')
-    parser.add_argument('--modify', action='store_true'
+    parser.add_argument('--modify', action='store_true',
                         help='Modify soft target')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
