@@ -66,6 +66,17 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
                 stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
 
+            if (args.distill or args.comp) and args.modify:
+                # modify soft pafs
+                paf_norm = (pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2)
+                paf_norm_m = -(paf_norm - 1)**2 + 1
+                multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
+                pafs_teacher = xp.repeat(multiplier, 2, axis=1) * pafs_teacher
+                # modify soft heatmaps
+                heatmaps_teacher_m = -(heatmaps_teacher - 1)**2 + 1
+                heatmaps_teacher_m[:, -1] = heatmaps_teacher[:, -1]**2
+                heatmaps_teacher = heatmaps_teacher_m
+
             if args.comp:
                 """hard targetとsoft targetで絶対値が大きい方を学習ラベルとしても用いる"""
                 pafs_t_mag = stage_pafs_t[:, ::2]**2 + stage_pafs_t[:, 1::2]**2
@@ -91,37 +102,23 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
             pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_t)
             heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
 
-        if not args.distill or args.comp:
+        if args.distill:
+            soft_pafs_loss = F.mean_squared_error(pafs_y, pafs_teacher)
+            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, heatmaps_teacher)
+
+        if args.distill and args.only_soft:
+            total_loss += soft_pafs_loss + soft_heatmaps_loss
+        elif args.distill:
+            total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
+        elif not args.distill:
             total_loss += pafs_loss + heatmaps_loss
-        else:
-            """distillation"""
-            if args.modify:
-                # modify soft pafs
-                paf_norm = (pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2)
-                paf_norm_m = -(paf_norm - 1)**2 + 1
-                multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
-                pafs_teacher_m = xp.repeat(multiplier, 2, axis=1) * pafs_teacher
-                # modify soft heatmaps
-                heatmaps_teacher_m = -(heatmaps_teacher - 1)**2 + 1
-                heatmaps_teacher_m[:, -1] = heatmaps_teacher[:, -1]**2
 
-                soft_pafs_loss = F.mean_squared_error(pafs_y, pafs_teacher_m)
-                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, heatmaps_teacher_m)
-            else:
-                soft_pafs_loss = F.mean_squared_error(pafs_y, pafs_teacher)
-                soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, heatmaps_teacher)
-
-            if args.only_soft:
-                total_loss += soft_pafs_loss + soft_heatmaps_loss
-            else:
-                total_loss += 0.5 * (pafs_loss + heatmaps_loss) + 0.5 * (soft_pafs_loss + soft_heatmaps_loss)
-
-        if not args.only_soft:
-            paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
-            heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
-        else:
+        if args.only_soft:
             paf_loss_log.append(float(cuda.to_cpu(soft_pafs_loss.data)))
             heatmap_loss_log.append(float(cuda.to_cpu(soft_heatmaps_loss.data)))
+        else:
+            paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
+            heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
 
     return total_loss, paf_loss_log, heatmap_loss_log
 
@@ -320,14 +317,17 @@ def parse_args():
                         help='number of posenet stages')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--distill', action='store_true')
-    parser.add_argument('--modify', action='store_true')
-    parser.add_argument('--only_soft', action='store_true')
-    parser.add_argument('--comp', action='store_true')
+    parser.add_argument('--only_soft', action='store_true'
+                        help='Train student model with only soft target')
+    parser.add_argument('--comp', action='store_true'
+                        help='Complete label with output of teacher model')
+    parser.add_argument('--modify', action='store_true'
+                        help='Modify soft target')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
-    parser.set_defaults(modify=False)
     parser.set_defaults(only_soft=False)
     parser.set_defaults(comp=False)
+    parser.set_defaults(modify=False)
     args = parser.parse_args()
     return args
 
@@ -357,7 +357,7 @@ if __name__ == '__main__':
 
     # Prepare teacher model for distillation
     teacher = None
-    if args.distill:
+    if args.distill or args.comp:
         teacher = posenet.PoseNet()
         serializers.load_npz('models/posenet_190k_ap_0.544.npz', teacher)
         teacher.disable_update()
@@ -366,7 +366,7 @@ if __name__ == '__main__':
     if args.gpu >= 0:
         chainer.cuda.get_device_from_id(args.gpu).use()
         model.to_gpu()
-        if args.distill:
+        if args.distill or args.comp:
             teacher.to_gpu()
 
     # Set up an optimizer
