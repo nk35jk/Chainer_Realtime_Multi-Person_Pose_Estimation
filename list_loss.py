@@ -13,6 +13,9 @@ from entity import JointType, params
 import chainer
 from chainer import serializers, cuda, functions as F
 
+HEATMAPS_LOSS_THRESH = 0.015
+PAFS_LOSS_THRESH = 0.025
+
 chainer.config.enable_backprop = False
 chainer.config.train = False
 
@@ -72,6 +75,10 @@ def parse_args():
 
 
 def list_loss():
+    output_dir = 'result/loss'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     if args.arch == 'posenet':
         model = params['archs'][args.arch](stages=args.stages)
     else:
@@ -90,15 +97,17 @@ def list_loss():
     pafs_losses = []
     heatmaps_losses = []
 
-    for i in range(len(val_loader)):
-    # for i in range(4):
+    # for i in range(len(val_loader)):
+    for i in range(4):
         print('\r{:4d}'.format(i), end='')
 
         img, pafs, heatmaps, ignore_mask = val_loader.get_example(i)
+
         img = img[None]
         pafs_t = pafs[None]
         heatmaps_t = heatmaps[None]
         ignore_mask = ignore_mask[None]
+        img_id = val_loader.img_id
 
         x_data = preprocess(img)
 
@@ -112,29 +121,56 @@ def list_loss():
 
         pafs_loss, heatmaps_loss = compute_loss(img, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t, ignore_mask, args.gpu)
 
+        # print('{} {}'.format(pafs_loss, heatmaps_loss))
+
         pafs_losses.append(pafs_loss)
         heatmaps_losses.append(heatmaps_loss)
 
-        # print('{} {}'.format(pafs_loss, heatmaps_loss))
+        img = img[0]
+        pafs = pafs_ys[-1].data[0]
+        heatmaps = heatmaps_ys[-1].data[0]
+        pafs_t = pafs_t[0]
+        heatmaps_t = heatmaps_t[0]
 
-        # if args.display:
-        #     cv2.imwrite('result/img/result.png'.format(), img)
-        #
-        #     cv2.imshow('results', img)
-        #     k = cv2.waitKey(1)
-        #     if k == ord('q'):
-        #         exit()
+        if args.gpu >= 0:
+            pafs = pafs.get()
+            heatmaps = heatmaps.get()
+            pafs_t = pafs_t.get()
+            heatmaps_t = heatmaps_t.get()
+
+        shape = (params['insize'],) * 2
+        heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape).transpose(2, 0, 1)
+        pafs = cv2.resize(pafs.transpose(1, 2, 0), shape).transpose(2, 0, 1)
+
+        if heatmaps_loss > HEATMAPS_LOSS_THRESH or pafs_loss > PAFS_LOSS_THRESH:
+            for i, (heatmap, heatmap_t) in enumerate(zip(heatmaps, heatmaps_t)):
+                rgb_heatmap = cv2.applyColorMap((heatmap.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
+                heatmap_img = cv2.addWeighted(img, 0.3, rgb_heatmap, 0.7, 0)
+                cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmap{}.jpg'.format(img_id, i)), heatmap_img)
+
+                rgb_heatmap = cv2.applyColorMap((heatmap_t.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
+                heatmap_img = cv2.addWeighted(img, 0.3, rgb_heatmap, 0.7, 0)
+                cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmap{}_t.jpg'.format(img_id, i)), heatmap_img)
+
+            for i, (paf, paf_t) in enumerate(zip(pafs, pafs_t)):
+                rgb_paf = cv2.applyColorMap((paf.clip(-1, 1)*127.5+127.5).astype(np.uint8), cv2.COLORMAP_JET)
+                paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
+                cv2.imwrite(os.path.join(output_dir, '{:08d}_paf{}.jpg'.format(img_id, i)), paf_img)
+
+                rgb_paf = cv2.applyColorMap((paf_t.clip(-1, 1)*127.5+127.5).astype(np.uint8), cv2.COLORMAP_JET)
+                paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
+                cv2.imwrite(os.path.join(output_dir, '{:08d}_paf{}_t.jpg'.format(img_id, i)), paf_img)
 
     plt.hist(pafs_losses)
     plt.xlabel('PAFs loss')
     plt.ylabel('Frequency')
-    plt.savefig('result/pafs_loss_hist.png')
+    plt.savefig('result/loss/pafs_loss_hist.png')
     plt.clf()
 
     plt.hist(heatmaps_losses)
     plt.xlabel('Heatmaps loss')
     plt.ylabel('Frequency')
-    plt.savefig('result/heatmaps_loss_hist.png')
+    plt.savefig('result/loss/heatmaps_loss_hist.png')
     plt.clf()
 
 

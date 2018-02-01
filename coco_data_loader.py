@@ -355,6 +355,8 @@ class CocoDataLoader(DatasetMixin):
             img_id = self.imgIds[np.random.randint(len(self))]
             img, img_id, annotations, ignore_mask = self.get_img_annotation(img_id=img_id)
 
+        self.img_id = img_id
+
         poses = self.parse_coco_annotation(annotations)
         resized_img, pafs, heatmaps, ignore_mask = self.generate_labels(img, poses, ignore_mask)
         return resized_img, pafs, heatmaps, ignore_mask
