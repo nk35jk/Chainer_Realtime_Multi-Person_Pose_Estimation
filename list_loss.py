@@ -97,8 +97,8 @@ def list_loss():
     pafs_losses = []
     heatmaps_losses = []
 
-    # for i in range(len(val_loader)):
-    for i in range(4):
+    for i in range(len(val_loader)):
+    # for i in range(4):
         print('\r{:4d}'.format(i), end='')
 
         img, pafs, heatmaps, ignore_mask = val_loader.get_example(i)
