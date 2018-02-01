@@ -104,6 +104,9 @@ def list_loss():
 
         if args.gpu >= 0:
             x_data = cuda.to_gpu(x_data)
+            pafs_t = cuda.to_gpu(pafs_t)
+            heatmaps_t = cuda.to_gpu(heatmaps_t)
+            ignore_mask = cuda.to_gpu(ignore_mask)
 
         pafs_ys, heatmaps_ys = model(x_data)
 
