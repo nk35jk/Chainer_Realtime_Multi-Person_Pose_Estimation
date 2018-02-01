@@ -42,8 +42,8 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t, ignore_mask, de
         heatmaps_loss += F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
 
     if device >= 0:
-        pafs_loss = pafs_loss.get()
-        heatmaps_loss = heatmaps_loss.get()
+        pafs_loss = cuda.to_cpu(pafs_loss)
+        heatmaps_loss = cuda.to_cpu(heatmaps_loss)
 
     return pafs_loss.data, heatmaps_loss.data
 
