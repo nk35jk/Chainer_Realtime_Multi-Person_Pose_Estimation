@@ -139,8 +139,11 @@ def list_loss():
             heatmaps_t = heatmaps_t.get()
 
         shape = (params['insize'],) * 2
+        shape2 = (params['insize'] // params['downscale'],) * 2
         heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape).transpose(2, 0, 1)
         pafs = cv2.resize(pafs.transpose(1, 2, 0), shape).transpose(2, 0, 1)
+        heatmaps_t = cv2.resize(cv2.resize(heatmaps_t.transpose(1, 2, 0), shape2), shape).transpose(2, 0, 1)
+        pafs_t = cv2.resize(cv2.resize(pafs_t.transpose(1, 2, 0), shape2), shape).transpose(2, 0, 1)
 
         if heatmaps_loss > HEATMAPS_LOSS_THRESH or pafs_loss > PAFS_LOSS_THRESH:
             for i, (heatmap, heatmap_t) in enumerate(zip(heatmaps, heatmaps_t)):
