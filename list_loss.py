@@ -38,14 +38,14 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t, ignore_mask, de
         stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
         stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
 
-        pafs_loss += F.mean_squared_error(pafs_y, stage_pafs_t)
-        heatmaps_loss += F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
+        pafs_loss += F.mean_squared_error(pafs_y, stage_pafs_t).data
+        heatmaps_loss += F.mean_squared_error(heatmaps_y, stage_heatmaps_t).data
 
     if device >= 0:
-        pafs_loss = cuda.to_cpu(pafs_loss)
-        heatmaps_loss = cuda.to_cpu(heatmaps_loss)
+        pafs_loss = pafs_loss.get()
+        heatmaps_loss = heatmaps_loss.get()
 
-    return pafs_loss.data, heatmaps_loss.data
+    return pafs_loss, heatmaps_loss
 
 
 def preprocess(imgs):
