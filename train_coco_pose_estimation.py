@@ -54,6 +54,17 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
 
     # compute loss on each stage
     for pafs_y, heatmaps_y in zip(pafs_ys, heatmaps_ys):
+        if (args.distill or args.comp) and args.modify:
+            # modify soft pafs
+            paf_norm = (pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2)
+            paf_norm_m = -(paf_norm - 1)**2 + 1
+            multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
+            pafs_teacher = xp.repeat(multiplier, 2, axis=1) * pafs_teacher
+            # modify soft heatmaps
+            heatmaps_teacher_m = -(heatmaps_teacher - 1)**2 + 1
+            heatmaps_teacher_m[:, -1] = heatmaps_teacher[:, -1]**2
+            heatmaps_teacher = heatmaps_teacher_m
+
         if not args.only_soft:
             stage_pafs_t = pafs_t.copy()
             stage_heatmaps_t = heatmaps_t.copy()
@@ -65,17 +76,6 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 stage_heatmaps_t = F.resize_images(stage_heatmaps_t, pafs_y.shape[2:]).data
                 stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
                 stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
-
-            if (args.distill or args.comp) and args.modify:
-                # modify soft pafs
-                paf_norm = (pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2)
-                paf_norm_m = -(paf_norm - 1)**2 + 1
-                multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
-                pafs_teacher = xp.repeat(multiplier, 2, axis=1) * pafs_teacher
-                # modify soft heatmaps
-                heatmaps_teacher_m = -(heatmaps_teacher - 1)**2 + 1
-                heatmaps_teacher_m[:, -1] = heatmaps_teacher[:, -1]**2
-                heatmaps_teacher = heatmaps_teacher_m
 
             if args.comp:
                 """hard targetとsoft targetで絶対値が大きい方を学習ラベルとしても用いる"""
