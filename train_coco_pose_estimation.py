@@ -54,16 +54,20 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
 
     # compute loss on each stage
     for pafs_y, heatmaps_y in zip(pafs_ys, heatmaps_ys):
+        if args.distill or args.comp:
+            stage_pafs_teacher = pafs_teacher.copy()
+            stage_heatmaps_teacher = heatmaps_teacher.copy()
+
         if (args.distill or args.comp) and args.modify:
             # modify soft pafs
-            paf_norm = (pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2)
+            paf_norm = (stage_pafs_teacher[:, ::2]**2 + stage_pafs_teacher[:, 1::2]**2)
             paf_norm_m = -(paf_norm - 1)**2 + 1
             multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
-            pafs_teacher = xp.repeat(multiplier, 2, axis=1) * pafs_teacher
+            stage_pafs_teacher = xp.repeat(multiplier, 2, axis=1) * stage_pafs_teacher
             # modify soft heatmaps
-            heatmaps_teacher_m = -(heatmaps_teacher - 1)**2 + 1
-            heatmaps_teacher_m[:, -1] = heatmaps_teacher[:, -1]**2
-            heatmaps_teacher = heatmaps_teacher_m
+            heatmaps_teacher_m = -(stage_heatmaps_teacher - 1)**2 + 1
+            heatmaps_teacher_m[:, -1] = stage_heatmaps_teacher[:, -1]**2
+            stage_heatmaps_teacher = heatmaps_teacher_m
 
         if not args.only_soft:
             stage_pafs_t = pafs_t.copy()
@@ -81,19 +85,19 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 """hard targetとsoft targetで絶対値が大きい方を学習ラベルとしても用いる"""
                 pafs_t_mag = stage_pafs_t[:, ::2]**2 + stage_pafs_t[:, 1::2]**2
                 pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=1)
-                pafs_teacher_mag = pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2
+                pafs_teacher_mag = stage_pafs_teacher[:, ::2]**2 + stage_pafs_teacher[:, 1::2]**2
                 pafs_teacher_mag = xp.repeat(pafs_teacher_mag, 2, axis=1)
-                stage_pafs_t[pafs_t_mag < pafs_teacher_mag] = pafs_teacher[pafs_t_mag < pafs_teacher_mag]
+                stage_pafs_t[pafs_t_mag < pafs_teacher_mag] = stage_pafs_teacher[pafs_t_mag < pafs_teacher_mag]
 
-                stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]] = heatmaps_teacher[:, :-1][stage_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]].copy()
-                stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]] = heatmaps_teacher[:, -1][stage_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]].copy()
+                stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher[:, :-1]] = stage_heatmaps_teacher[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher[:, :-1]].copy()
+                stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher[:, -1]] = stage_heatmaps_teacher[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher[:, -1]].copy()
 
                 # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
-                # plt.imshow(heatmaps_teacher[1, -1], vmin=0, vmax=1); plt.show()
+                # plt.imshow(stage_heatmaps_teacher[1, -1], vmin=0, vmax=1); plt.show()
                 # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
                 #
                 # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
-                # plt.imshow(pafs_teacher[1, 7], vmin=-1, vmax=1); plt.show()
+                # plt.imshow(stage_pafs_teacher[1, 7], vmin=-1, vmax=1); plt.show()
                 # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
 
             stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
@@ -103,8 +107,8 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
             heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
 
         if args.distill:
-            soft_pafs_loss = F.mean_squared_error(pafs_y, pafs_teacher)
-            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, heatmaps_teacher)
+            soft_pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_teacher)
+            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_teacher)
 
         if args.distill and args.only_soft:
             total_loss += soft_pafs_loss + soft_heatmaps_loss
@@ -113,12 +117,15 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
         elif not args.distill:
             total_loss += pafs_loss + heatmaps_loss
 
-        if args.only_soft:
-            paf_loss_log.append(float(cuda.to_cpu(soft_pafs_loss.data)))
-            heatmap_loss_log.append(float(cuda.to_cpu(soft_heatmaps_loss.data)))
-        else:
-            paf_loss_log.append(float(cuda.to_cpu(pafs_loss.data)))
-            heatmap_loss_log.append(float(cuda.to_cpu(heatmaps_loss.data)))
+        if args.distill and args.only_soft:
+            paf_loss_log.append(soft_pafs_loss.data)
+            heatmap_loss_log.append(soft_heatmaps_loss.data)
+        elif args.distill:
+            paf_loss_log.append(0.5*pafs_loss.data + 0.5*soft_pafs_loss.data)
+            heatmap_loss_log.append(0.5*heatmaps_loss.data + 0.5*soft_heatmaps_loss.data)
+        elif not args.distill:
+            paf_loss_log.append(pafs_loss.data)
+            heatmap_loss_log.append(heatmaps_loss.data)
 
     return total_loss, paf_loss_log, heatmap_loss_log
 
