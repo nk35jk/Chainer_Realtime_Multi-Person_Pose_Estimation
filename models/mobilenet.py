@@ -192,5 +192,5 @@ if __name__ == '__main__':
     # chainer.config.train = False
 
     model = MobileNet()
-    arr = np.random.rand(2, 3, 368, 368).astype('f')
+    arr = np.random.rand(1, 3, model.insize, model.insize).astype('f')
     h1s, h2s = model(arr)
