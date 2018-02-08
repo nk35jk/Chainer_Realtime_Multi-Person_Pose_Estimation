@@ -133,10 +133,10 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
 def preprocess(imgs):
     xp = cuda.get_array_module(imgs)
     x_data = imgs.astype('f')
-    if args.arch in ['posenet']:
+    if args.arch in ['posenet', 'student']:
         x_data /= 255
         x_data -= 0.5
-    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'student', 'cpn', 'mobilenet']:
+    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'cpn', 'mobilenet']:
         x_data -= xp.array([104, 117, 123])
     x_data = x_data.transpose(0, 3, 1, 2)
     return x_data
@@ -161,7 +161,7 @@ class Updater(StandardUpdater):
                     optimizer.target[layer_name].enable_update()
             elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
                 optimizer.target.res.enable_update()
-            elif args.arch in ['nn1', 'student']:
+            elif args.arch in ['nn1']:
                 model.squeeze.enable_update()
 
         if 100000 <= self.iteration < 200000:
@@ -353,7 +353,7 @@ if __name__ == '__main__':
 
     if args.arch == 'posenet':
         posenet.copy_vgg_params(model)
-    elif args.arch in ['nn1', 'student']:
+    elif args.arch in ['nn1']:
         nn1.copy_squeezenet_params(model.squeeze)
     elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
         chainer.serializers.load_npz('models/resnet50.npz', model.res)
@@ -396,7 +396,7 @@ if __name__ == '__main__':
                 model[layer_name].disable_update()
         elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
             model.res.disable_update()
-        elif args.arch in ['nn1', 'student']:
+        elif args.arch in ['nn1']:
             model.squeeze.disable_update()
 
     # Load datasets
