@@ -30,8 +30,7 @@ class Student(chainer.Chain):
             self.conv5_4 = L.Convolution2D(128, 128, 7, stride=1, pad=1)
             self.conv5_5 = L.Convolution2D(128, 128, 7, stride=1, pad=1)
             self.conv5_6 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
-            self.conv5_7 = L.Convolution2D(128, limbs, 1, stride=1, pad=0)
-
+            self.conv5_7 = L.Convolution2D(128, limbs+joints, 1, stride=1, pad=0)
 
     def __call__(self, x):
         heatmaps = []
