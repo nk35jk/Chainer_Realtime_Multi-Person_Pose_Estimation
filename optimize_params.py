@@ -89,12 +89,15 @@ class Objective(object):
             cocoEval.accumulate()
             cocoEval.summarize()
             ap = cocoEval.stats[0]
+            ar = cocoEval.stats[5]
         except:
             ap = 0
+            ar = 0
 
         with open(self.path, 'a') as f:
-            f.write('{}, {}, {}, {}, {}, {}, {}, {}\n'.format(
+            f.write('{}, {}, {}, {}, {}, {}, {}, {}, {}\n'.format(
                 ap,
+                ar,
                 p['n_integ_points'],
                 p['n_integ_points_thresh'],
                 p['heatmap_peak_thresh'],
@@ -104,7 +107,7 @@ class Objective(object):
                 p['subset_score_thresh'],
             ))
 
-        return -ap
+        return -(ap+ar)
 
 
 if __name__ == '__main__':
