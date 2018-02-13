@@ -62,7 +62,7 @@ class MobileNet(chainer.Chain):
     downscale = 8
     pad = downscale
 
-    mean = [103.94,116.78,123.68]
+    mean = [103.94, 116.78, 123.68]
     scale = 0.017
 
     def __init__(self, joints=19, limbs=38):
@@ -88,53 +88,51 @@ class MobileNet(chainer.Chain):
             self.conv3_1_sp_bn = L.BatchNormalization(128)
             self.conv3_2_dw = L.DepthwiseConvolution2D(128, 1, 3, stride=2, pad=1, nobias=True)  # 1/8
             self.conv3_2_dw_bn = L.BatchNormalization(128)
-            self.conv3_2_sp = L.Convolution2D(128, 256, 1, nobias=True)
-            self.conv3_2_sp_bn = L.BatchNormalization(256)
+            self.conv3_2_sp = L.Convolution2D(128, 128, 1, nobias=True)
+            self.conv3_2_sp_bn = L.BatchNormalization(128)
 
-            self.conv4_1_dw = L.DepthwiseConvolution2D(256, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv4_1_dw_bn = L.BatchNormalization(256)
-            self.conv4_1_sp = L.Convolution2D(256, 256, 1, nobias=True)
-            self.conv4_1_sp_bn = L.BatchNormalization(256)
-            self.conv4_2_dw = L.DepthwiseConvolution2D(256, 1, 3, stride=1, pad=1, nobias=True)  # stride=2
-            self.conv4_2_dw_bn = L.BatchNormalization(256)
-            self.conv4_2_sp = L.Convolution2D(256, 512, 1, nobias=True)
-            self.conv4_2_sp_bn = L.BatchNormalization(512)
+            self.conv4_1_dw = L.DepthwiseConvolution2D(128, 1, 5, stride=1, pad=2, nobias=True)
+            self.conv4_1_dw_bn = L.BatchNormalization(128)
+            self.conv4_1_sp = L.Convolution2D(128, 128, 1, nobias=True)
+            self.conv4_1_sp_bn = L.BatchNormalization(128)
+            self.conv4_2_dw = L.DepthwiseConvolution2D(128, 1, 5, stride=1, pad=2, nobias=True)  # stride=2
+            self.conv4_2_dw_bn = L.BatchNormalization(128)
+            self.conv4_2_sp = L.Convolution2D(128, 256, 1, nobias=True)
+            self.conv4_2_sp_bn = L.BatchNormalization(256)
 
-            self.conv5_1_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv5_1_dw_bn = L.BatchNormalization(512)
-            self.conv5_1_sp = L.Convolution2D(512, 512, 1, nobias=True)
-            self.conv5_1_sp_bn = L.BatchNormalization(512)
-            self.conv5_2_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv5_2_dw_bn = L.BatchNormalization(512)
-            self.conv5_2_sp = L.Convolution2D(512, 512, 1, nobias=True)
-            self.conv5_2_sp_bn = L.BatchNormalization(512)
-            self.conv5_3_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv5_3_dw_bn = L.BatchNormalization(512)
-            self.conv5_3_sp = L.Convolution2D(512, 512, 1, nobias=True)
-            self.conv5_3_sp_bn = L.BatchNormalization(512)
-            self.conv5_4_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv5_4_dw_bn = L.BatchNormalization(512)
-            self.conv5_4_sp = L.Convolution2D(512, 512, 1, nobias=True)
-            self.conv5_4_sp_bn = L.BatchNormalization(512)
-            self.conv5_5_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv5_5_dw_bn = L.BatchNormalization(512)
-            self.conv5_5_sp = L.Convolution2D(512, 512, 1, nobias=True)
-            self.conv5_5_sp_bn = L.BatchNormalization(512)
-            self.conv5_6_dw = L.DepthwiseConvolution2D(512, 1, 3, stride=1, pad=1, nobias=True)  # stride=2
-            self.conv5_6_dw_bn = L.BatchNormalization(512)
-            self.conv5_6_sp = L.Convolution2D(512, 1024, 1, nobias=True)
-            self.conv5_6_sp_bn = L.BatchNormalization(1024)
+            self.conv5_1_dw = L.DepthwiseConvolution2D(256, 1, 5, stride=1, pad=2, nobias=True)
+            self.conv5_1_dw_bn = L.BatchNormalization(256)
+            self.conv5_1_sp = L.Convolution2D(256, 256, 1, nobias=True)
+            self.conv5_1_sp_bn = L.BatchNormalization(256)
+            self.conv5_2_dw = L.DepthwiseConvolution2D(256, 1, 5, stride=1, pad=2, nobias=True)
+            self.conv5_2_dw_bn = L.BatchNormalization(256)
+            self.conv5_2_sp = L.Convolution2D(256, 256, 1, nobias=True)
+            self.conv5_2_sp_bn = L.BatchNormalization(256)
+            self.conv5_3_dw = L.DepthwiseConvolution2D(256, 1, 5, stride=1, pad=2, nobias=True)
+            self.conv5_3_dw_bn = L.BatchNormalization(256)
+            self.conv5_3_sp = L.Convolution2D(256, 256, 1, nobias=True)
+            self.conv5_3_sp_bn = L.BatchNormalization(256)
+            self.conv5_4_dw = L.DepthwiseConvolution2D(256, 1, 5, stride=1, pad=2, nobias=True)
+            self.conv5_4_dw_bn = L.BatchNormalization(256)
+            self.conv5_4_sp = L.Convolution2D(256, 256, 1, nobias=True)
+            self.conv5_4_sp_bn = L.BatchNormalization(256)
+            self.conv5_5_dw = L.DepthwiseConvolution2D(256, 1, 5, stride=1, pad=2, nobias=True)
+            self.conv5_5_dw_bn = L.BatchNormalization(256)
+            self.conv5_5_sp = L.Convolution2D(256, 256, 1, nobias=True)
+            self.conv5_5_sp_bn = L.BatchNormalization(256)
+            self.conv5_6_dw = L.DepthwiseConvolution2D(256, 1, 5, stride=1, pad=2, nobias=True)  # stride=2
+            self.conv5_6_dw_bn = L.BatchNormalization(256)
+            self.conv5_6_sp = L.Convolution2D(256, 256, 1, nobias=True)
+            self.conv5_6_sp_bn = L.BatchNormalization(256)
 
             # self.non_local = NonLocalBlock()
 
-            self.conv6_dw = L.DepthwiseConvolution2D(1024, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv6_dw_bn = L.BatchNormalization(1024)
-            self.conv6_sp = L.Convolution2D(1024, 1024, 1, nobias=True)
-            self.conv6_sp_bn = L.BatchNormalization(1024)
+            self.conv6_dw = L.DepthwiseConvolution2D(256, 1, 5, stride=1, pad=2, nobias=True)
+            self.conv6_dw_bn = L.BatchNormalization(256)
+            self.conv6_sp = L.Convolution2D(256, 256, 1, nobias=True)
+            self.conv6_sp_bn = L.BatchNormalization(256)
 
-            self.conv7_dw = L.DepthwiseConvolution2D(1024, 1, 3, stride=1, pad=1, nobias=True)
-            self.conv7_dw_bn = L.BatchNormalization(1024)
-            self.conv7_sp = L.Convolution2D(1024, limbs+joints, 1, nobias=True)
+            self.conv7 = L.Convolution2D(256, limbs+joints, 1)
 
             # self.fc7 = L.Linear(1024, 1000)
 
@@ -176,8 +174,7 @@ class MobileNet(chainer.Chain):
         h = F.relu(self.conv6_dw_bn(self.conv6_dw(h)))
         h = F.relu(self.conv6_sp_bn(self.conv6_sp(h)))
 
-        h = F.relu(self.conv7_dw_bn(self.conv7_dw(h)))
-        h = self.conv7_sp(h)
+        h = self.conv7(h)
 
         pafs.append(h[:, :self.limbs])
         heatmaps.append(h[:, -self.joints:])
