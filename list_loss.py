@@ -13,8 +13,8 @@ from entity import JointType, params
 import chainer
 from chainer import serializers, cuda, functions as F
 
-HEATMAPS_LOSS_THRESH = 0.015
-PAFS_LOSS_THRESH = 0.025
+HEATMAPS_LOSS_THRESH = 0  # 0.015
+PAFS_LOSS_THRESH = 0  # 0.025
 
 chainer.config.enable_backprop = False
 chainer.config.train = False
@@ -71,6 +71,15 @@ def parse_args():
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
     params['pad'] = params['archs'][args.arch].pad
+
+    params['insize'] = 368*2
+    params['inference_img_size'] = 368*2
+    params['paf_sigma'] = 8
+    params['heatmap_sigma'] = 7
+    params['min_scale'] = 1
+    params['max_scale'] = 1
+    params['max_rotate_degree'] = 0
+    params['center_perterb_max'] = 0
     return args
 
 
@@ -92,16 +101,19 @@ def list_loss():
         model.to_gpu()
 
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-    val_loader = CocoDataLoader(coco_val, model.insize, mode='val', n_samples=None)
+    val_loader = CocoDataLoader(coco_val, params['inference_img_size'], mode='val', n_samples=None)
 
     pafs_losses = []
     heatmaps_losses = []
 
-    for i in range(len(val_loader)):
-    # for i in range(4):
+    img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507, 62808,
+               66771, 70739, 84031, 84674, 93437, 131444, 143572]
+
+    # for i in range(len(val_loader)):
+    for i in img_ids:
         print('\r{:4d}'.format(i), end='')
 
-        img, pafs, heatmaps, ignore_mask = val_loader.get_example(i)
+        img, pafs, heatmaps, ignore_mask = val_loader.get_example(None, img_id=i)
 
         img = img[None]
         pafs_t = pafs[None]
@@ -163,6 +175,17 @@ def list_loss():
                 rgb_paf = cv2.applyColorMap((paf_t.clip(-1, 1)*127.5+127.5).astype(np.uint8), cv2.COLORMAP_JET)
                 paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
                 cv2.imwrite(os.path.join(output_dir, '{:08d}_paf{}_t.jpg'.format(img_id, i)), paf_img)
+
+            paf_norms = (pafs[::2]**2 + pafs[1::2]**2)**0.5
+            paf_norms_t = (pafs_t[::2]**2 + pafs_t[1::2]**2)**0.5
+            for i, (paf_norm, paf_norm_t) in enumerate(zip(paf_norms, paf_norms_t)):
+                rgb_paf = cv2.applyColorMap((paf_norm.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_BONE)
+                paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
+                cv2.imwrite(os.path.join(output_dir, '{:08d}_paf_norm{}.jpg'.format(img_id, i)), paf_img)
+
+                rgb_paf = cv2.applyColorMap((paf_norm_t.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_BONE)
+                paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
+                cv2.imwrite(os.path.join(output_dir, '{:08d}_paf_norm{}_t.jpg'.format(img_id, i)), paf_img)
 
     plt.hist(pafs_losses)
     plt.xlabel('PAFs loss')

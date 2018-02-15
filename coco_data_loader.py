@@ -343,8 +343,11 @@ class CocoDataLoader(DatasetMixin):
         ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
         return resized_img, pafs, heatmaps, ignore_mask
 
-    def get_example(self, i):
-        img, img_id, annotations, ignore_mask = self.get_img_annotation(ind=i)
+    def get_example(self, i, img_id=None):
+        if img_id:
+            img, img_id, annotations, ignore_mask = self.get_img_annotation(img_id=img_id)
+        else:
+            img, img_id, annotations, ignore_mask = self.get_img_annotation(ind=i)
 
         if self.mode == 'eval':
             # don't need to make heatmaps/pafs
@@ -362,7 +365,20 @@ class CocoDataLoader(DatasetMixin):
         return resized_img, pafs, heatmaps, ignore_mask
 
 if __name__ == '__main__':
-    mode = 'train'
+    params['min_keypoints'] = 1  # 5
+    params['min_area'] = 0  # 32 * 32
+    params['insize'] = 500
+    params['paf_sigma'] = 8
+    params['heatmap_sigma'] = 7
+    params['min_scale'] = 1
+    params['max_scale'] = 1
+    params['max_rotate_degree'] = 0
+    params['center_perterb_max'] = 0
+    # train: 326, 395, 459
+    # val: 1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507, 62808,
+    # 66771, 70739, 84031, 84674, 93437, 131444, 143572
+
+    mode = 'val'
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(coco, params['insize'], mode=mode)
 
@@ -370,6 +386,9 @@ if __name__ == '__main__':
 
     for i in range(len(data_loader)):
         img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
+
+        print('\r{}'.format(img_id), end='')
+
         if annotations is not None:
             poses = data_loader.parse_coco_annotation(annotations)
             resized_img, pafs, heatmaps, ignore_mask = data_loader.generate_labels(img, poses, ignore_mask)
