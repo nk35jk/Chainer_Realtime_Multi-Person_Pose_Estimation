@@ -173,16 +173,64 @@ class Updater(StandardUpdater):
 
         imgs, pafs, heatmaps, ignore_mask = self.converter(batch, self.device)
 
+        xp = cuda.get_array_module(imgs)
+
         x_data = preprocess(imgs)
 
         pafs_ys, heatmaps_ys = optimizer.target(x_data)
 
-        pafs_teacher = heatmaps_teacher = None
+        pafs_teacher = heatmaps_teacher = 0
+
+        # # single scale prediction
+        # if self.teacher:
+        #     x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+        #     h1s, h2s = self.teacher(x_data)
+        #     # pafs_teacher += h1s[-1].data
+        #     # heatmaps_teacher += h2s[-1].data
+        #     pafs_teacher_s = h1s[-1].data
+        #     heatmaps_teacher_s = h2s[-1].data
+
+        # # multi scale and flip prediction (average)
+        # if self.teacher:
+        #     for scale in params['inference_scales']:
+        #         insize = int(self.teacher.insize * scale)
+        #         outsize = self.teacher.insize // self.teacher.downscale
+        #         x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+        #         x_data = F.resize_images(x_data, (insize, insize))
+        #
+        #         h1s, h2s = self.teacher(x_data)
+        #         pafs_teacher += F.resize_images(h1s[-1], (outsize, outsize)).data
+        #         heatmaps_teacher += F.resize_images(h2s[-1], (outsize, outsize)).data
+        # pafs_teacher /= len(params['inference_scales'])
+        # heatmaps_teacher /= len(params['inference_scales'])
+        # pafs_teacher_a = pafs_teacher.copy()
+        # heatmaps_teacher_a = heatmaps_teacher.copy()
+
+        pafs_teacher = heatmaps_teacher = 0
+        # multi scale and flip prediction (max)
         if self.teacher:
-            x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
-            h1s, h2s = self.teacher(x_data)
-            pafs_teacher = h1s[-1].data
-            heatmaps_teacher = h2s[-1].data
+            for scale in params['inference_scales']:
+                insize = int(self.teacher.insize * scale)
+                outsize = self.teacher.insize // self.teacher.downscale
+                x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+                x_data = F.resize_images(x_data, (insize, insize))
+
+                h1s, h2s = self.teacher(x_data)
+
+                if pafs_teacher is 0 and heatmaps_teacher is 0:
+                    pafs_teacher = F.resize_images(h1s[-1], (outsize, outsize)).data
+                    heatmaps_teacher = F.resize_images(h2s[-1], (outsize, outsize)).data
+                else:
+                    pafs_teacher2 = F.resize_images(h1s[-1], (outsize, outsize)).data
+                    pafs_mag1 = pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2
+                    pafs_mag1 = xp.repeat(pafs_mag1, 2, axis=1)
+                    pafs_mag2 = pafs_teacher2[:, ::2]**2 + pafs_teacher2[:, 1::2]**2
+                    pafs_mag2 = xp.repeat(pafs_mag2, 2, axis=1)
+                    pafs_teacher[pafs_mag1 < pafs_mag2] = pafs_teacher2[pafs_mag1 < pafs_mag2]
+
+                    heatmaps_teacher2 = F.resize_images(h2s[-1], (outsize, outsize)).data
+                    heatmaps_teacher[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]] = heatmaps_teacher2[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]].copy()
+                    heatmaps_teacher[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]] = heatmaps_teacher2[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]].copy()
 
         loss, paf_loss_log, heatmap_loss_log = compute_loss(
             imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pafs_teacher,

@@ -198,7 +198,7 @@ if __name__ == '__main__':
     arr = np.random.rand(1, 3, model.insize, model.insize).astype('f')
     h1s, h2s = model(arr)
 
-    import chainer.computational_graph as c
-    g = c.build_computational_graph(h1s)
-    with open('graph.dot', 'w') as o:
-        o.write(g.dump())
+    # import chainer.computational_graph as c
+    # g = c.build_computational_graph(h1s)
+    # with open('graph.dot', 'w') as o:
+    #     o.write(g.dump())

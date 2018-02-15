@@ -344,6 +344,7 @@ class CocoDataLoader(DatasetMixin):
         return resized_img, pafs, heatmaps, ignore_mask
 
     def get_example(self, i, img_id=None):
+        
         if img_id:
             img, img_id, annotations, ignore_mask = self.get_img_annotation(img_id=img_id)
         else:
@@ -378,7 +379,7 @@ if __name__ == '__main__':
     # val: 1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507, 62808,
     # 66771, 70739, 84031, 84674, 93437, 131444, 143572
 
-    mode = 'val'
+    mode = 'train'
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(coco, params['insize'], mode=mode)
 
@@ -411,3 +412,20 @@ if __name__ == '__main__':
                 sys.exit()
             elif k == ord('d'):
                 import ipdb; ipdb.set_trace()
+
+
+# if __name__ == '__main__':
+#     """人物面積のヒストグラムを取得"""
+#
+#     params['min_keypoints'] = 0  # 5
+#     params['min_area'] = 0  # 32 * 32
+#
+#     mode = 'val'
+#     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
+#     data_loader = CocoDataLoader(coco, params['insize'], mode=mode)
+#
+#     areas = []
+#     for i in range(len(data_loader)):
+#         img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
+#         for ann in annotations:
+#             areas.append(ann['area'])

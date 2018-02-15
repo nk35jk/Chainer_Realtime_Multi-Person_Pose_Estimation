@@ -23,7 +23,7 @@ class PoseNet(chainer.Chain):
     insize = 368
     downscale = pad = 8
 
-    def __init__(self, joints=19, limbs=38, stuffs=2, stages=6):
+    def __init__(self, joints=19, limbs=38, stages=6):
         super(PoseNet, self).__init__()
         self.stages = stages
         with self.init_scope():
@@ -55,11 +55,11 @@ class PoseNet(chainer.Chain):
 
         self.links = []
         for i in range(2, stages+1):
-            self.add_stage(i, self.links, joints, limbs, stuffs)
+            self.add_stage(i, self.links, joints, limbs)
         for link in self.links:
             self.add_link(*link)
 
-    def add_stage(self, stage, links, joints, limbs, stuffs):
+    def add_stage(self, stage, links, joints, limbs):
         in_channels = 128 + joints + limbs
         links += [('Mconv1_stage{}_L1'.format(stage), L.Convolution2D(in_channels, 128, 7, stride=1, pad=3))]
         links += [('Mconv2_stage{}_L1'.format(stage), L.Convolution2D(128, 128, 7, stride=1, pad=3))]
