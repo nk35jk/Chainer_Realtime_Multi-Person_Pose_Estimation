@@ -184,7 +184,8 @@ class Updater(StandardUpdater):
         # # single scale prediction
         # if self.teacher:
         #     x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
-        #     h1s, h2s = self.teacher(x_data)
+        #     with function.no_backprop_mode():
+        #         h1s, h2s = self.teacher(x_data)
         #     # pafs_teacher += h1s[-1].data
         #     # heatmaps_teacher += h2s[-1].data
         #     pafs_teacher_s = h1s[-1].data
@@ -198,7 +199,8 @@ class Updater(StandardUpdater):
         #         x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
         #         x_data = F.resize_images(x_data, (insize, insize))
         #
-        #         h1s, h2s = self.teacher(x_data)
+        #         with function.no_backprop_mode():
+        #             h1s, h2s = self.teacher(x_data)
         #         pafs_teacher += F.resize_images(h1s[-1], (outsize, outsize)).data
         #         heatmaps_teacher += F.resize_images(h2s[-1], (outsize, outsize)).data
         # pafs_teacher /= len(params['inference_scales'])
@@ -215,7 +217,8 @@ class Updater(StandardUpdater):
                 x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
                 x_data = F.resize_images(x_data, (insize, insize))
 
-                h1s, h2s = self.teacher(x_data)
+                with function.no_backprop_mode():
+                    h1s, h2s = self.teacher(x_data)
 
                 if pafs_teacher is 0 and heatmaps_teacher is 0:
                     pafs_teacher = F.resize_images(h1s[-1], (outsize, outsize)).data
