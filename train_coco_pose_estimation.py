@@ -55,19 +55,21 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
     # compute loss on each stage
     for pafs_y, heatmaps_y in zip(pafs_ys, heatmaps_ys):
         if args.distill or args.comp:
-            stage_pafs_teacher = pafs_teacher.copy()
-            stage_heatmaps_teacher = heatmaps_teacher.copy()
+            stage_pafs_teacher_distill = pafs_teacher.copy()
+            stage_heatmaps_teacher_distill = heatmaps_teacher.copy()
+            stage_pafs_teacher_comp = pafs_teacher.copy()
+            stage_heatmaps_teacher_comp = heatmaps_teacher.copy()
 
-        if (args.distill or args.comp) and args.modify:
+        if args.distill and args.modify:
             # modify soft pafs
-            paf_norm = (stage_pafs_teacher[:, ::2]**2 + stage_pafs_teacher[:, 1::2]**2)
+            paf_norm = (stage_pafs_teacher_distill[:, ::2]**2 + stage_pafs_teacher_distill[:, 1::2]**2)
             paf_norm_m = -(paf_norm - 1)**2 + 1
             multiplier = xp.where(paf_norm > 1e-3, paf_norm_m/paf_norm, 0)
-            stage_pafs_teacher = xp.repeat(multiplier, 2, axis=1) * stage_pafs_teacher
+            stage_pafs_teacher_distill = xp.repeat(multiplier, 2, axis=1) * stage_pafs_teacher_distill
             # modify soft heatmaps
-            heatmaps_teacher_m = -(stage_heatmaps_teacher - 1)**2 + 1
-            heatmaps_teacher_m[:, -1] = stage_heatmaps_teacher[:, -1]**2
-            stage_heatmaps_teacher = heatmaps_teacher_m
+            heatmaps_teacher_m = -(stage_heatmaps_teacher_distill - 1)**2 + 1
+            heatmaps_teacher_m[:, -1] = stage_heatmaps_teacher_distill[:, -1]**2
+            stage_heatmaps_teacher_distill = heatmaps_teacher_m
 
         if not args.only_soft:
             stage_pafs_t = pafs_t.copy()
@@ -85,19 +87,19 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 """hard targetとsoft targetで絶対値が大きい方を学習ラベルとしても用いる"""
                 pafs_t_mag = stage_pafs_t[:, ::2]**2 + stage_pafs_t[:, 1::2]**2
                 pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=1)
-                pafs_teacher_mag = stage_pafs_teacher[:, ::2]**2 + stage_pafs_teacher[:, 1::2]**2
+                pafs_teacher_mag = stage_pafs_teacher_comp[:, ::2]**2 + stage_pafs_teacher_comp[:, 1::2]**2
                 pafs_teacher_mag = xp.repeat(pafs_teacher_mag, 2, axis=1)
-                stage_pafs_t[pafs_t_mag < pafs_teacher_mag] = stage_pafs_teacher[pafs_t_mag < pafs_teacher_mag]
+                stage_pafs_t[pafs_t_mag < pafs_teacher_mag] = stage_pafs_teacher_comp[pafs_t_mag < pafs_teacher_mag]
 
-                stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher[:, :-1]] = stage_heatmaps_teacher[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher[:, :-1]].copy()
-                stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher[:, -1]] = stage_heatmaps_teacher[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher[:, -1]].copy()
+                stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]] = stage_heatmaps_teacher_comp[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]].copy()
+                stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]] = stage_heatmaps_teacher_comp[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]].copy()
 
                 # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
-                # plt.imshow(stage_heatmaps_teacher[1, -1], vmin=0, vmax=1); plt.show()
+                # plt.imshow(stage_heatmaps_teacher_comp[1, -1], vmin=0, vmax=1); plt.show()
                 # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
                 #
                 # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
-                # plt.imshow(stage_pafs_teacher[1, 7], vmin=-1, vmax=1); plt.show()
+                # plt.imshow(stage_pafs_teacher_comp[1, 7], vmin=-1, vmax=1); plt.show()
                 # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
 
             stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
@@ -107,8 +109,8 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
             heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_t)
 
         if args.distill:
-            soft_pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_teacher)
-            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_teacher)
+            soft_pafs_loss = F.mean_squared_error(pafs_y, stage_pafs_teacher_distill)
+            soft_heatmaps_loss = F.mean_squared_error(heatmaps_y, stage_heatmaps_teacher_distill)
 
         if args.distill and args.only_soft:
             total_loss += soft_pafs_loss + soft_heatmaps_loss
@@ -181,15 +183,15 @@ class Updater(StandardUpdater):
 
         pafs_teacher = heatmaps_teacher = 0
 
-        # # single scale prediction
-        # if self.teacher:
-        #     x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
-        #     with function.no_backprop_mode():
-        #         h1s, h2s = self.teacher(x_data)
-        #     # pafs_teacher += h1s[-1].data
-        #     # heatmaps_teacher += h2s[-1].data
-        #     pafs_teacher_s = h1s[-1].data
-        #     heatmaps_teacher_s = h2s[-1].data
+        # single scale prediction
+        if self.teacher:
+            x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+            with function.no_backprop_mode():
+                h1s, h2s = self.teacher(x_data)
+            pafs_teacher += h1s[-1].data
+            heatmaps_teacher += h2s[-1].data
+            pafs_teacher_s = pafs_teacher.copy()
+            heatmaps_teacher_s = heatmaps_teacher.copy()
 
         # # multi scale and flip prediction (average)
         # if self.teacher:
@@ -208,32 +210,31 @@ class Updater(StandardUpdater):
         # pafs_teacher_a = pafs_teacher.copy()
         # heatmaps_teacher_a = heatmaps_teacher.copy()
 
-        pafs_teacher = heatmaps_teacher = 0
-        # multi scale and flip prediction (max)
-        if self.teacher:
-            for scale in params['inference_scales']:
-                insize = int(self.teacher.insize * scale)
-                outsize = self.teacher.insize // self.teacher.downscale
-                x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
-                x_data = F.resize_images(x_data, (insize, insize))
-
-                with function.no_backprop_mode():
-                    h1s, h2s = self.teacher(x_data)
-
-                if pafs_teacher is 0 and heatmaps_teacher is 0:
-                    pafs_teacher = F.resize_images(h1s[-1], (outsize, outsize)).data
-                    heatmaps_teacher = F.resize_images(h2s[-1], (outsize, outsize)).data
-                else:
-                    pafs_teacher2 = F.resize_images(h1s[-1], (outsize, outsize)).data
-                    pafs_mag1 = pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2
-                    pafs_mag1 = xp.repeat(pafs_mag1, 2, axis=1)
-                    pafs_mag2 = pafs_teacher2[:, ::2]**2 + pafs_teacher2[:, 1::2]**2
-                    pafs_mag2 = xp.repeat(pafs_mag2, 2, axis=1)
-                    pafs_teacher[pafs_mag1 < pafs_mag2] = pafs_teacher2[pafs_mag1 < pafs_mag2]
-
-                    heatmaps_teacher2 = F.resize_images(h2s[-1], (outsize, outsize)).data
-                    heatmaps_teacher[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]] = heatmaps_teacher2[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]].copy()
-                    heatmaps_teacher[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]] = heatmaps_teacher2[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]].copy()
+        # # multi scale and flip prediction (max)
+        # if self.teacher:
+        #     for scale in params['inference_scales']:
+        #         insize = int(self.teacher.insize * scale)
+        #         outsize = self.teacher.insize // self.teacher.downscale
+        #         x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+        #         x_data = F.resize_images(x_data, (insize, insize))
+        #
+        #         with function.no_backprop_mode():
+        #             h1s, h2s = self.teacher(x_data)
+        #
+        #         if pafs_teacher is 0 and heatmaps_teacher is 0:
+        #             pafs_teacher = F.resize_images(h1s[-1], (outsize, outsize)).data
+        #             heatmaps_teacher = F.resize_images(h2s[-1], (outsize, outsize)).data
+        #         else:
+        #             pafs_teacher2 = F.resize_images(h1s[-1], (outsize, outsize)).data
+        #             pafs_mag1 = pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2
+        #             pafs_mag1 = xp.repeat(pafs_mag1, 2, axis=1)
+        #             pafs_mag2 = pafs_teacher2[:, ::2]**2 + pafs_teacher2[:, 1::2]**2
+        #             pafs_mag2 = xp.repeat(pafs_mag2, 2, axis=1)
+        #             pafs_teacher[pafs_mag1 < pafs_mag2] = pafs_teacher2[pafs_mag1 < pafs_mag2]
+        #
+        #             heatmaps_teacher2 = F.resize_images(h2s[-1], (outsize, outsize)).data
+        #             heatmaps_teacher[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]] = heatmaps_teacher2[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]].copy()
+        #             heatmaps_teacher[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]] = heatmaps_teacher2[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]].copy()
 
         loss, paf_loss_log, heatmap_loss_log = compute_loss(
             imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pafs_teacher,
@@ -245,9 +246,9 @@ class Updater(StandardUpdater):
             'main/heat': sum(heatmap_loss_log),
         })
 
-        optimizer.target.cleargrads()
-        loss.backward()
-        optimizer.update()
+        # optimizer.target.cleargrads()
+        # loss.backward()
+        # optimizer.update()
 
 
 class Validator(extensions.Evaluator):
@@ -378,9 +379,10 @@ def parse_args():
     parser.add_argument('--only_soft', action='store_true',
                         help='Train student model with only soft target')
     parser.add_argument('--comp', action='store_true',
-                        help='Complete label with output of teacher model')
+                        help='Complement label with output of teacher model')
     parser.add_argument('--modify', action='store_true',
-                        help='Modify soft target')
+                        help='Modify output of teacher model for distillation' \
+                        +'(not for label omplement)')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
     parser.set_defaults(only_soft=False)
