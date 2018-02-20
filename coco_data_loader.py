@@ -344,7 +344,6 @@ class CocoDataLoader(DatasetMixin):
         return resized_img, pafs, heatmaps, ignore_mask
 
     def get_example(self, i, img_id=None):
-        
         if img_id:
             img, img_id, annotations, ignore_mask = self.get_img_annotation(img_id=img_id)
         else:
@@ -366,8 +365,8 @@ class CocoDataLoader(DatasetMixin):
         return resized_img, pafs, heatmaps, ignore_mask
 
 if __name__ == '__main__':
-    params['min_keypoints'] = 1  # 5
-    params['min_area'] = 0  # 32 * 32
+    params['min_keypoints'] = 5
+    params['min_area'] = 32 * 32
     params['insize'] = 500
     params['paf_sigma'] = 8
     params['heatmap_sigma'] = 7
@@ -375,18 +374,19 @@ if __name__ == '__main__':
     params['max_scale'] = 1
     params['max_rotate_degree'] = 0
     params['center_perterb_max'] = 0
-    # train: 326, 395, 459
-    # val: 1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507, 62808,
-    # 66771, 70739, 84031, 84674, 93437, 131444, 143572
+    # img_ids = [326, 395, 459]  # trainのGTのラベルが適切でなさそうなもの
+    img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
+               62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]  # valのGTのラベルが適切でなさそうなもの
 
-    mode = 'train'
+    mode = 'val'  # train, val, eval
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(coco, params['insize'], mode=mode)
 
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
     for i in range(len(data_loader)):
-        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
+        # img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
+        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(img_id=img_ids[i])
 
         print('\r{}'.format(img_id), end='')
 
@@ -406,8 +406,9 @@ if __name__ == '__main__':
             img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:-1].max(axis=0))
             img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask)
 
-            cv2.imshow('w', np.hstack((resized_img, img_to_show)))
-            k = cv2.waitKey(0)
+            cv2.imshow('w', np.hstack([resized_img, img_to_show]))
+            cv2.imwrite('result/label_ex/{:08d}_gt.jpg'.format(img_ids[i]), np.hstack([resized_img, img_to_show]))
+            k = cv2.waitKey(1)
             if k == ord('q'):
                 sys.exit()
             elif k == ord('d'):
