@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     for i in range(args.start, args.end+1, args.step):
         print(i)
-         model_path = '{}/model_iter_{}'.format(args.result, i)
-         if os.path.exists(model_path):
-             subprocess.call('python evaluate_coco.py {} {} -g{}'.format(
-                args.arch, model_path, args.gpu), shell=True)
+        model_path = '{}/model_iter_{}'.format(args.result, i)
+        if os.path.exists(model_path):
+            subprocess.call('python evaluate_coco.py {} {} -g{}'.format(
+                            args.arch, model_path, args.gpu), shell=True)
