@@ -246,9 +246,9 @@ class Updater(StandardUpdater):
             'main/heat': sum(heatmap_loss_log),
         })
 
-        # optimizer.target.cleargrads()
-        # loss.backward()
-        # optimizer.update()
+        optimizer.target.cleargrads()
+        loss.backward()
+        optimizer.update()
 
 
 class Validator(extensions.Evaluator):
@@ -416,11 +416,12 @@ if __name__ == '__main__':
         chainer.serializers.load_npz(args.initmodel, model)
 
     # Prepare teacher model for distillation
-    teacher = None
     if args.distill or args.comp:
         teacher = posenet.PoseNet()
         serializers.load_npz('models/posenet_190k_ap_0.544.npz', teacher)
         teacher.disable_update()
+    else:
+        teacher = None
 
     # Set up GPU
     if args.gpu >= 0:
