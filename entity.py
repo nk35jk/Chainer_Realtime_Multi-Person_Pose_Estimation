@@ -54,7 +54,6 @@ class JointType(IntEnum):
 
 params = {
     'coco_dir': 'coco',
-    'coco_stuff_dir': 'cocostuff-10k-v1',
     'archs': {
         # 'posenet': CocoPoseNet,
         'posenet': PoseNet,
@@ -82,6 +81,7 @@ params = {
     'max_rotate_degree': 40,
     'center_perterb_max': 40,
 
+    'teacher_path': 'models/posenet_190k_ap_0.544.npz',
     'teacher_types': ['single', 'multi_avg', 'multi_max'],
     'teacher_scales': [1, 1.5, 2],
 
