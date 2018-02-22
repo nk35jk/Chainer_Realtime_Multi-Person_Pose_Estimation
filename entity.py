@@ -82,6 +82,9 @@ params = {
     'max_rotate_degree': 40,
     'center_perterb_max': 40,
 
+    'teacher_types': ['single', 'multi_avg', 'multi_max'],
+    'teacher_scales': [1, 1.5, 2],
+
     # inference params
     'inference_img_size': 368,
     'inference_scales': [0.5, 1, 1.5, 2],

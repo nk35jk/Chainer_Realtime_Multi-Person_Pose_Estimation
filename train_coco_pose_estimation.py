@@ -183,58 +183,59 @@ class Updater(StandardUpdater):
 
         pafs_teacher = heatmaps_teacher = 0
 
-        # single scale prediction
         if self.teacher:
-            x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
-            with function.no_backprop_mode():
-                h1s, h2s = self.teacher(x_data)
-            pafs_teacher += h1s[-1].data
-            heatmaps_teacher += h2s[-1].data
-            pafs_teacher_s = pafs_teacher.copy()
-            heatmaps_teacher_s = heatmaps_teacher.copy()
+            if args.teacher_type == 'single':
+                # single scale prediction
+                x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+                with function.no_backprop_mode():
+                    h1s, h2s = self.teacher(x_data)
+                pafs_teacher += h1s[-1].data
+                heatmaps_teacher += h2s[-1].data
+                pafs_teacher_s = pafs_teacher.copy()
+                heatmaps_teacher_s = heatmaps_teacher.copy()
 
-        # # multi scale and flip prediction (average)
-        # if self.teacher:
-        #     for scale in params['inference_scales']:
-        #         insize = int(self.teacher.insize * scale)
-        #         outsize = self.teacher.insize // self.teacher.downscale
-        #         x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
-        #         x_data = F.resize_images(x_data, (insize, insize))
-        #
-        #         with function.no_backprop_mode():
-        #             h1s, h2s = self.teacher(x_data)
-        #         pafs_teacher += F.resize_images(h1s[-1], (outsize, outsize)).data
-        #         heatmaps_teacher += F.resize_images(h2s[-1], (outsize, outsize)).data
-        # pafs_teacher /= len(params['inference_scales'])
-        # heatmaps_teacher /= len(params['inference_scales'])
-        # pafs_teacher_a = pafs_teacher.copy()
-        # heatmaps_teacher_a = heatmaps_teacher.copy()
+            elif args.teacher_type == 'multi_avg':
+                # multi scale and flip prediction (average)
+                for scale in params['teacher_scales']:
+                    insize = int(self.teacher.insize * scale)
+                    outsize = self.teacher.insize // self.teacher.downscale
+                    x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+                    x_data = F.resize_images(x_data, (insize, insize))
 
-        # # multi scale and flip prediction (max)
-        # if self.teacher:
-        #     for scale in params['inference_scales']:
-        #         insize = int(self.teacher.insize * scale)
-        #         outsize = self.teacher.insize // self.teacher.downscale
-        #         x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
-        #         x_data = F.resize_images(x_data, (insize, insize))
-        #
-        #         with function.no_backprop_mode():
-        #             h1s, h2s = self.teacher(x_data)
-        #
-        #         if pafs_teacher is 0 and heatmaps_teacher is 0:
-        #             pafs_teacher = F.resize_images(h1s[-1], (outsize, outsize)).data
-        #             heatmaps_teacher = F.resize_images(h2s[-1], (outsize, outsize)).data
-        #         else:
-        #             pafs_teacher2 = F.resize_images(h1s[-1], (outsize, outsize)).data
-        #             pafs_mag1 = pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2
-        #             pafs_mag1 = xp.repeat(pafs_mag1, 2, axis=1)
-        #             pafs_mag2 = pafs_teacher2[:, ::2]**2 + pafs_teacher2[:, 1::2]**2
-        #             pafs_mag2 = xp.repeat(pafs_mag2, 2, axis=1)
-        #             pafs_teacher[pafs_mag1 < pafs_mag2] = pafs_teacher2[pafs_mag1 < pafs_mag2]
-        #
-        #             heatmaps_teacher2 = F.resize_images(h2s[-1], (outsize, outsize)).data
-        #             heatmaps_teacher[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]] = heatmaps_teacher2[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]].copy()
-        #             heatmaps_teacher[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]] = heatmaps_teacher2[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]].copy()
+                    with function.no_backprop_mode():
+                        h1s, h2s = self.teacher(x_data)
+                    pafs_teacher += F.resize_images(h1s[-1], (outsize, outsize)).data
+                    heatmaps_teacher += F.resize_images(h2s[-1], (outsize, outsize)).data
+            pafs_teacher /= len(params['teacher_scales'])
+            heatmaps_teacher /= len(params['teacher_scales'])
+            pafs_teacher_a = pafs_teacher.copy()
+            heatmaps_teacher_a = heatmaps_teacher.copy()
+
+            elif args.teacher_type == 'multi_max':
+                # multi scale and flip prediction (max)
+                for scale in params['teacher_scales']:
+                    insize = int(self.teacher.insize * scale)
+                    outsize = self.teacher.insize // self.teacher.downscale
+                    x_data = ((imgs.astype('f') / 255) - 0.5).transpose(0, 3, 1, 2)
+                    x_data = F.resize_images(x_data, (insize, insize))
+
+                    with function.no_backprop_mode():
+                        h1s, h2s = self.teacher(x_data)
+
+                    if pafs_teacher is 0 and heatmaps_teacher is 0:
+                        pafs_teacher = F.resize_images(h1s[-1], (outsize, outsize)).data
+                        heatmaps_teacher = F.resize_images(h2s[-1], (outsize, outsize)).data
+                    else:
+                        pafs_teacher2 = F.resize_images(h1s[-1], (outsize, outsize)).data
+                        pafs_mag1 = pafs_teacher[:, ::2]**2 + pafs_teacher[:, 1::2]**2
+                        pafs_mag1 = xp.repeat(pafs_mag1, 2, axis=1)
+                        pafs_mag2 = pafs_teacher2[:, ::2]**2 + pafs_teacher2[:, 1::2]**2
+                        pafs_mag2 = xp.repeat(pafs_mag2, 2, axis=1)
+                        pafs_teacher[pafs_mag1 < pafs_mag2] = pafs_teacher2[pafs_mag1 < pafs_mag2]
+
+                        heatmaps_teacher2 = F.resize_images(h2s[-1], (outsize, outsize)).data
+                        heatmaps_teacher[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]] = heatmaps_teacher2[:, :-1][heatmaps_teacher[:, :-1] < heatmaps_teacher2[:, :-1]].copy()
+                        heatmaps_teacher[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]] = heatmaps_teacher2[:, -1][heatmaps_teacher[:, -1] > heatmaps_teacher2[:, -1]].copy()
 
         loss, paf_loss_log, heatmap_loss_log = compute_loss(
             imgs, pafs_ys, heatmaps_ys, pafs, heatmaps, pafs_teacher,
@@ -360,7 +361,7 @@ def parse_args():
                         help='Number of validation samples')
     parser.add_argument('--eval_samples', type=int, default=100,
                         help='Number of validation samples')
-    parser.add_argument('--iteration', '-i', type=int, default=300000,
+    parser.add_argument('--iteration', '-i', type=int, default=240000,
                         help='Number of iterations to train')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
@@ -383,6 +384,9 @@ def parse_args():
     parser.add_argument('--modify', action='store_true',
                         help='Modify output of teacher model for distillation' \
                         +'(not for label omplement)')
+    parser.add_argument('--teacher_path', default='models/posenet_190k_ap_0.544.npz')
+    parser.add_argument('--teacher_types', choices=params['teacher_types'],
+                        default='single')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
     parser.set_defaults(only_soft=False)
@@ -418,7 +422,7 @@ if __name__ == '__main__':
     # Prepare teacher model for distillation
     if args.distill or args.comp:
         teacher = posenet.PoseNet()
-        serializers.load_npz('models/posenet_190k_ap_0.544.npz', teacher)
+        serializers.load_npz(args.teacher_path, teacher)
         teacher.disable_update()
     else:
         teacher = None
