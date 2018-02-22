@@ -98,15 +98,30 @@ class PoseDetector(object):
                 map_top[:, 1:] = heatmap[:, :-1]
                 map_bottom[:, :-1] = heatmap[:, 1:]
 
-                peaks_binary = xp.logical_and.reduce((
-                    heatmap > params['heatmap_peak_thresh'],
-                    heatmap > map_left,
-                    heatmap > map_right,
-                    heatmap > map_top,
-                    heatmap > map_bottom,
-                ))
+                # old
+                # peaks_binary = xp.logical_and.reduce((
+                #     heatmap > params['heatmap_peak_thresh'],
+                #     heatmap > map_left,
+                #     heatmap > map_right,
+                #     heatmap > map_top,
+                #     heatmap > map_bottom,
+                # ))
+                # peaks = zip(xp.nonzero(peaks_binary)[1], xp.nonzero(peaks_binary)[0])  # [(x, y), (x, y)...]のpeak座標配列
 
-                peaks = zip(xp.nonzero(peaks_binary)[1], xp.nonzero(peaks_binary)[0])  # [(x, y), (x, y)...]のpeak座標配列
+                # improved
+                xx, yy = xp.meshgrid(range(heatmap.shape[1]), range(heatmap.shape[0]))
+                cand_inds = heatmap > params['heatmap_peak_thresh']
+                candidates = heatmap[cand_inds]
+                peaks_binary_ = xp.logical_and.reduce((
+                    candidates > map_left[cand_inds],
+                    candidates > map_right[cand_inds],
+                    candidates > map_top[cand_inds],
+                    candidates > map_bottom[cand_inds],
+                ))
+                peak_xs = xx[cand_inds][peaks_binary_]
+                peak_ys = yy[cand_inds][peaks_binary_]
+                peaks = [(x, y) for x, y in zip(peak_xs, peak_ys)]
+
                 peaks_with_score = [(i,) + peak_pos + (heatmap[peak_pos[1], peak_pos[0]],) for peak_pos in peaks]
                 peaks_id = range(peak_counter, peak_counter + len(peaks_with_score))
                 peaks_with_score_and_id = [peaks_with_score[i] + (peaks_id[i], ) for i in range(len(peaks_id))]
