@@ -385,7 +385,7 @@ def parse_args():
                         help='Modify output of teacher model for distillation' \
                         +'(not for label omplement)')
     parser.add_argument('--teacher_path', default='models/posenet_190k_ap_0.544.npz')
-    parser.add_argument('--teacher_types', choices=params['teacher_types'],
+    parser.add_argument('--teacher_type', choices=params['teacher_types'],
                         default='single')
     parser.set_defaults(test=False)
     parser.set_defaults(distill=False)
