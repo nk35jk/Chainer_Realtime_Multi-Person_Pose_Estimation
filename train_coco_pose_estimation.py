@@ -206,10 +206,10 @@ class Updater(StandardUpdater):
                         h1s, h2s = self.teacher(x_data)
                     pafs_teacher += F.resize_images(h1s[-1], (outsize, outsize)).data
                     heatmaps_teacher += F.resize_images(h2s[-1], (outsize, outsize)).data
-            pafs_teacher /= len(params['teacher_scales'])
-            heatmaps_teacher /= len(params['teacher_scales'])
-            pafs_teacher_a = pafs_teacher.copy()
-            heatmaps_teacher_a = heatmaps_teacher.copy()
+                pafs_teacher /= len(params['teacher_scales'])
+                heatmaps_teacher /= len(params['teacher_scales'])
+                pafs_teacher_a = pafs_teacher.copy()
+                heatmaps_teacher_a = heatmaps_teacher.copy()
 
             elif args.teacher_type == 'multi_max':
                 # multi scale and flip prediction (max)
