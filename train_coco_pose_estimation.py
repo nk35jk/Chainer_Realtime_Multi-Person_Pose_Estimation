@@ -407,6 +407,8 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
+    print(json.dumps(vars(args), sort_keys=True, indent=4))
+
     np.random.seed(0)
     random.seed(0)
 
