@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument('arch', choices=params['archs'].keys(), default='posenet', help='Model architecture')
     parser.add_argument('weights', help='weights file path')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--n_samples', type=int, default=100)
     parser.add_argument('--vis', action='store_true', help='visualize results')
     parser.add_argument('--stages', '-s', type=int, default=6, help='number of posenet stages')
     parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
@@ -45,7 +46,7 @@ def evaluate():
     res = []
     imgIds = []
     # for i in range(len(eval_loader)):
-    for i in range(100):
+    for i in range(args.n_samples):
     # for i in [1]:
         img, annotations, img_id = eval_loader.get_example(i)
         print('{:4d}, img id = {}'.format(i, img_id))
