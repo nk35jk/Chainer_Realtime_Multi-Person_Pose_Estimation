@@ -505,9 +505,9 @@ if __name__ == '__main__':
     # trainer.extend(extensions.ExponentialShift(
     # 'lr', args.lr_decay_rate), trigger=(args.lr_decay_iter, 'iteration'))
     # trainer.extend(extensions.dump_graph('main/loss'))
-    trainer.extend(extensions.snapshot(), trigger=val_interval)
+    trainer.extend(extensions.snapshot(), trigger=(2000, 'iteration'))
     trainer.extend(extensions.snapshot_object(
-        model, 'model_iter_{.updater.iteration}'), trigger=(2000, 'iteration'))
+        model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
     trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
