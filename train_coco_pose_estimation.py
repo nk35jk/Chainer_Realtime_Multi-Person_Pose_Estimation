@@ -6,6 +6,7 @@ import glob
 import random
 import argparse
 import datetime
+import subprocess
 import numpy as np
 import multiprocessing
 import matplotlib.pyplot as plt
@@ -351,31 +352,40 @@ class Evaluator(extensions.Evaluator):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train pose estimation')
-    parser.add_argument('--arch', '-a', choices=params['archs'].keys(), default='posenet',
+
+    parser.add_argument('--arch', '-a', choices=params['archs'].keys(),
+                        default='posenet',
                         help='Model architecture')
+    parser.add_argument('--stages', '-s', type=int, default=6,
+                        help='number of posenet stages')
+    parser.add_argument('--initmodel',
+                        help='Initialize the model from given file')
+
     parser.add_argument('--batchsize', '-B', type=int, default=10,
                         help='Learning minibatch size')
     parser.add_argument('--valbatchsize', '-b', type=int, default=4,
                         help='Validation minibatch size')
+    parser.add_argument('--iteration', '-i', type=int, default=240000,
+                        help='Number of iterations to train')
+    parser.add_argument('--loaderjob', '-j', type=int,
+                        help='Number of parallel data loading processes')
     parser.add_argument('--val_samples', type=int, default=100,
                         help='Number of validation samples')
     parser.add_argument('--eval_samples', type=int, default=100,
                         help='Number of validation samples')
-    parser.add_argument('--iteration', '-i', type=int, default=240000,
-                        help='Number of iterations to train')
+    # parser.add_argument('--initial_lr', type=float, default=0.05)
+    # parser.add_argument('--lr_decay_rate', type=float, default=0.1)
+    # parser.add_argument('--lr_decay_iter', type=int, default=80000)
+    parser.add_argument('--val_iter', type=int, default=1000)
+    parser.add_argument('--log_iter', type=int, default=20)
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
-    parser.add_argument('--initmodel',
-                        help='Initialize the model from given file')
-    parser.add_argument('--loaderjob', '-j', type=int,
-                        help='Number of parallel data loading processes')
-    parser.add_argument('--resume', '-r', default='',
-                        help='Initialize the trainer from given file')
+    parser.add_argument('--coco_dir')
     parser.add_argument('--out', '-o', default='result/test',
                         help='Output directory')
-    parser.add_argument('--stages', '-s', type=int, default=6,
-                        help='number of posenet stages')
-    parser.add_argument('--test', action='store_true')
+    parser.add_argument('--resume', '-r', default='',
+                        help='Initialize the trainer from given file')
+
     parser.add_argument('--distill', action='store_true')
     parser.add_argument('--only_soft', action='store_true',
                         help='Train student model with only soft target')
@@ -384,20 +394,20 @@ def parse_args():
     parser.add_argument('--modify', action='store_true',
                         help='Modify output of teacher model for distillation' \
                         +'(not for label omplement)')
-    parser.add_argument('--teacher_path', default='models/posenet_190k_ap_0.544.npz')
+    parser.add_argument('--teacher_path', default=params['teacher_path'])
     parser.add_argument('--teacher_type', choices=params['teacher_types'],
                         default='single')
-    parser.set_defaults(test=False)
-    parser.set_defaults(distill=False)
-    parser.set_defaults(only_soft=False)
-    parser.set_defaults(comp=False)
-    parser.set_defaults(modify=False)
+
+    parser.add_argument('--test', action='store_true')
+
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
     args = parse_args()
+
+    print(json.dumps(vars(args), sort_keys=True, indent=4))
 
     np.random.seed(0)
     random.seed(0)
@@ -458,8 +468,9 @@ if __name__ == '__main__':
             model.squeeze.disable_update()
 
     # Load datasets
-    coco_train = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_train2017.json'))
-    coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
+    coco_dir = args.coco_dir or params['coco_dir']
+    coco_train = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_train2017.json'))
+    coco_val = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_val2017.json'))
     train_loader = CocoDataLoader(coco_train, model.insize, mode='train')
     val_loader = CocoDataLoader(coco_val, model.insize, mode='val', n_samples=args.val_samples)
     # eval_loader = CocoDataLoader(coco_val, model, mode='eval', n_samples=args.eval_samples)
@@ -484,13 +495,15 @@ if __name__ == '__main__':
     updater = Updater(train_iter, model, teacher, optimizer, device=args.gpu)
     trainer = training.Trainer(updater, (args.iteration, 'iteration'), args.out)
 
-    val_interval = (10 if args.test else 1000), 'iteration'
-    log_interval = (1 if args.test else 20), 'iteration'
+    val_interval = (10 if args.test else args.val_iter), 'iteration'
+    log_interval = (1 if args.test else args.log_iter), 'iteration'
 
     trainer.extend(Validator(val_iter, model, teacher, device=args.gpu),
                    trigger=val_interval)
     # trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
     #                trigger=val_interval)
+    # trainer.extend(extensions.ExponentialShift(
+    # 'lr', args.lr_decay_rate), trigger=(args.lr_decay_iter, 'iteration'))
     # trainer.extend(extensions.dump_graph('main/loss'))
     trainer.extend(extensions.snapshot(), trigger=(2000, 'iteration'))
     trainer.extend(extensions.snapshot_object(
@@ -509,8 +522,7 @@ if __name__ == '__main__':
     if not os.path.exists(args.out):
         os.makedirs(args.out)
     txt = '@{}'.format(datetime.datetime.now().strftime('%y%m%d_%H%M'))
-    with open(os.path.join(args.out, txt), 'w') as f:
-        pass
+    subprocess.call("touch '{}'".format(os.path.join(args.out, txt)), shell=True)
     with open(os.path.join(args.out, 'params.json'), 'w') as f:
         json.dump(vars(args), f)
 
