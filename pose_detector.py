@@ -29,6 +29,7 @@ class PoseDetector(object):
 
             if weights_file:
                 serializers.load_npz(weights_file, self.model)
+            print('Done.')
 
         self.device = device
         if self.device >= 0:

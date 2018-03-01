@@ -492,7 +492,7 @@ if __name__ == '__main__':
     # trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
     #                trigger=val_interval)
     # trainer.extend(extensions.dump_graph('main/loss'))
-    trainer.extend(extensions.snapshot(), trigger=val_interval)
+    trainer.extend(extensions.snapshot(), trigger=(2000, 'iteration'))
     trainer.extend(extensions.snapshot_object(
         model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
     trainer.extend(extensions.LogReport(trigger=log_interval))
