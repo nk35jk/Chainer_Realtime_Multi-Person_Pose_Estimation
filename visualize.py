@@ -19,6 +19,9 @@ chainer.config.enable_backprop = False
 chainer.config.train = False
 
 
+"""アノテーション, モデルの出力, 推論結果を保存, html出力"""
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description='COCO evaluation')
     parser.add_argument('arch', choices=params['archs'].keys(), default='posenet', help='Model architecture')

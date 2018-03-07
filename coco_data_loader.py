@@ -58,7 +58,10 @@ class CocoDataLoader(DatasetMixin):
         return img
 
     def overlay_ignore_mask(self, img, ignore_mask):
-        img = img * np.repeat((ignore_mask == 0).astype(np.uint8)[:, :, None], 3, axis=2)
+        canvas = img.copy()
+        canvas[ignore_mask] = [0, 0, 255]
+        img = cv2.addWeighted(img, 0.2, canvas, 0.8, 0)
+        # img = img * np.repeat((ignore_mask == 0).astype(np.uint8)[:, :, None], 3, axis=2)
         return img
 
     def get_pose_bboxes(self, poses):
