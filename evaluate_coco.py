@@ -39,7 +39,7 @@ def evaluate():
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
 
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-    eval_loader = CocoDataLoader(coco_val, pose_detector.model.insize, mode='eval', n_samples=None)
+    eval_loader = CocoDataLoader(params['coco_dir'], coco_val, pose_detector.model.insize, mode='eval', n_samples=None)
 
     # cv2.namedWindow('results', cv2.WINDOW_NORMAL)
 
