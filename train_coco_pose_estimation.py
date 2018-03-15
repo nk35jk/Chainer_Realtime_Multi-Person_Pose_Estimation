@@ -471,9 +471,9 @@ if __name__ == '__main__':
     coco_dir = args.coco_dir or params['coco_dir']
     coco_train = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_val2017.json'))
-    train_loader = CocoDataLoader(coco_train, model.insize, mode='train')
-    val_loader = CocoDataLoader(coco_val, model.insize, mode='val', n_samples=args.val_samples)
-    # eval_loader = CocoDataLoader(coco_val, model, mode='eval', n_samples=args.eval_samples)
+    train_loader = CocoDataLoader(coco_dir, coco_train, model.insize, mode='train')
+    val_loader = CocoDataLoader(coco_dir, coco_val, model.insize, mode='val', n_samples=args.val_samples)
+    # eval_loader = CocoDataLoader(coco_dir, coco_val, model, mode='eval', n_samples=args.eval_samples)
 
     # Set up iterators
     if args.loaderjob:
@@ -505,9 +505,10 @@ if __name__ == '__main__':
     # trainer.extend(extensions.ExponentialShift(
     # 'lr', args.lr_decay_rate), trigger=(args.lr_decay_iter, 'iteration'))
     # trainer.extend(extensions.dump_graph('main/loss'))
-    trainer.extend(extensions.snapshot(), trigger=(2000, 'iteration'))
-    trainer.extend(extensions.snapshot_object(
-        model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
+    if not args.test:
+        trainer.extend(extensions.snapshot(), trigger=(2000, 'iteration'))
+        trainer.extend(extensions.snapshot_object(
+            model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
     trainer.extend(extensions.LogReport(trigger=log_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',

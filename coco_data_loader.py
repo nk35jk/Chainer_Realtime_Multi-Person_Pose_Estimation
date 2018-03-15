@@ -14,7 +14,8 @@ from entity import JointType, params
 
 
 class CocoDataLoader(DatasetMixin):
-    def __init__(self, coco, insize, mode='train', n_samples=None):
+    def __init__(self, coco_dir, coco, insize, mode='train', n_samples=None):
+        self.coco_dir = coco_dir
         self.coco = coco
         assert mode in ['train', 'val', 'eval'], 'Data loading mode is invalid.'
         self.mode = mode
@@ -298,11 +299,12 @@ class CocoDataLoader(DatasetMixin):
                 annotations = valid_annotations_for_img
 
         if self.mode == 'train':
-            img_path = os.path.join(params['coco_dir'], 'train2017', self.coco.loadImgs([img_id])[0]['file_name'])
-            mask_path = os.path.join(params['coco_dir'], 'ignore_mask_train2017', '{:012d}.png'.format(img_id))
+            img_path = os.path.join(self.coco_dir, 'train2017', self.coco.loadImgs([img_id])[0]['file_name'])
+            mask_path = os.path.join(self.coco_dir, 'ignore_mask_train2017', '{:012d}.png'.format(img_id))
         else:
-            img_path = os.path.join(params['coco_dir'], 'val2017', self.coco.loadImgs([img_id])[0]['file_name'])
-            mask_path = os.path.join(params['coco_dir'], 'ignore_mask_val2017', '{:012d}.png'.format(img_id))
+            img_path = os.path.join(self.coco_dir, 'val2017', self.coco.loadImgs([img_id])[0]['file_name'])
+            mask_path = os.path.join(self.coco_dir, 'ignore_mask_val2017', '{:012d}.png'.format(img_id))
+
         img = cv2.imread(img_path)
         ignore_mask = cv2.imread(mask_path, 0)
         if ignore_mask is None:
