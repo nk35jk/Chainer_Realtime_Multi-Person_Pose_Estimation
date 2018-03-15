@@ -1,5 +1,6 @@
 import os
 import cv2
+import sys
 import time
 import argparse
 import numpy as np
@@ -14,6 +15,8 @@ from pose_detector import PoseDetector
 from pose_detector import draw_person_pose
 
 import chainer
+from chainer import cuda
+import chainer.functions as F
 
 chainer.config.enable_backprop = False
 chainer.config.train = False
@@ -99,7 +102,7 @@ if __name__ == '__main__':
         cv2.imshow('w', np.hstack([resized_img, img_to_show]))
         cv2.imwrite('result/gt_label/{:08d}_gt.jpg'.format(img_id), img_to_show)
         cv2.imwrite('result/gt_label/{:08d}.jpg'.format(img_id), resized_img)
-        k = cv2.waitKey(0)
+        k = cv2.waitKey(1)
         if k == ord('q'):
             sys.exit()
         elif k == ord('d'):
@@ -126,6 +129,34 @@ if __name__ == '__main__':
             rgb_paf = cv2.applyColorMap((abs_paf.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
             paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
             cv2.imwrite(os.path.join(output_dir, '{:08d}_abs_paf{}.jpg'.format(img_id, i)), paf_img)
+
+        """ラベル補正"""
+        xp = cuda.get_array_module(pose_detector.pafs)
+        comp_pafs_t = pafs.copy()
+        comp_heatmaps_t = heatmaps.copy()
+        pafs_teacher = pose_detector.pafs.copy()
+        heatmaps_teacher = pose_detector.heatmaps.copy()
+        shape = comp_heatmaps_t.shape[:2]
+        pafs_teacher = F.resize_images(pafs_teacher[None], shape).data[0]
+        heatmaps_teacher = F.resize_images(heatmaps_teacher[None], shape).data[0]
+        # pafs
+        pafs_t_mag = comp_pafs_t[::2]**2 + comp_pafs_t[1::2]**2
+        pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=0)
+        pafs_teacher_mag = pafs_teacher[::2]**2 + pafs_teacher[1::2]**2
+        pafs_teacher_mag = xp.repeat(pafs_teacher_mag, 2, axis=0)
+        import ipdb; ipdb.set_trace()
+        comp_pafs_t[pafs_t_mag < pafs_teacher_mag] = pafs_teacher[pafs_t_mag < pafs_teacher_mag]
+        # heatmaps
+        comp_heatmaps_t[:, :-1][comp_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]] = heatmaps_teacher[:, :-1][comp_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]].copy()
+        comp_heatmaps_t[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]] = heatmaps_teacher[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]].copy()
+
+        import ipdb; ipdb.set_trace()
+
+        # overlay labels
+        img_to_show = resized_img.copy()
+        # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask)
+        img_to_show = data_loader.overlay_pafs(img_to_show, pafs)
+        img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:-1].max(axis=0))
 
         # # heatmap peaks
         # joint_colors = [
