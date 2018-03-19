@@ -31,13 +31,13 @@ class CocoDataLoader(DatasetMixin):
         return len(self.imgIds)
 
     def overlay_paf(self, img, paf):
-        hue = ((np.arctan2(paf[1], paf[0]) / np.pi) / -2 + 0.5)
-        saturation = np.sqrt(paf[0] ** 2 + paf[1] ** 2)
-        saturation[saturation > 1.0] = 1.0
-        value = saturation.copy()
-        hsv_paf = np.vstack((hue[np.newaxis], saturation[np.newaxis], value[np.newaxis])).transpose(1, 2, 0)
-        rgb_paf = cv2.cvtColor((hsv_paf * 255).astype(np.uint8), cv2.COLOR_HSV2BGR)
-        img = cv2.addWeighted(img, 0.6, rgb_paf, 0.4, 0)
+        hue = (np.arctan2(paf[1], paf[0]) / np.pi) / -2 + 0.5
+        saturation = np.ones_like(hue)
+        value = np.sqrt(paf[0] ** 2 + paf[1] ** 2) * 2  # twiced
+        value[value > 1.0] = 1.0
+        hsv_paf = np.stack([hue*180, saturation*255, value*255]).transpose(1, 2, 0)
+        rgb_paf = cv2.cvtColor(hsv_paf.astype(np.uint8), cv2.COLOR_HSV2BGR)
+        img = cv2.addWeighted(img, 0.4, rgb_paf, 0.6, 0)
         return img
 
     def overlay_pafs(self, img, pafs):
@@ -55,7 +55,7 @@ class CocoDataLoader(DatasetMixin):
 
     def overlay_heatmap(self, img, heatmap):
         rgb_heatmap = cv2.applyColorMap((heatmap * 255).astype(np.uint8), cv2.COLORMAP_JET)
-        img = cv2.addWeighted(img, 0.6, rgb_heatmap, 0.4, 0)
+        img = cv2.addWeighted(img, 0.5, rgb_heatmap, 0.5, 0)
         return img
 
     def overlay_ignore_mask(self, img, ignore_mask):
@@ -385,7 +385,7 @@ if __name__ == '__main__':
 
     mode = 'val'  # train, val, eval
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
-    data_loader = CocoDataLoader(coco, params['insize'], mode=mode)
+    data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode)
 
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
@@ -413,7 +413,7 @@ if __name__ == '__main__':
 
             cv2.imshow('w', np.hstack([resized_img, img_to_show]))
             cv2.imwrite('result/label_ex/{:08d}_gt.jpg'.format(img_ids[i]), np.hstack([resized_img, img_to_show]))
-            k = cv2.waitKey(1)
+            k = cv2.waitKey(0)
             if k == ord('q'):
                 sys.exit()
             elif k == ord('d'):
