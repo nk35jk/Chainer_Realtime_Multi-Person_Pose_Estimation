@@ -180,7 +180,7 @@ python coco_data_loader.py
 ```
 
 ### Visualize labels completed with distillation
-Execute the following command to visualize labels completed with the teacher model. HTML file will be saved in `result/visualization/visualization.html`.
+Execute the following command to visualize labels completed with the teacher model. Resulting HTML file will be saved in `result/visualization/visualization.html`.
 
 ```
 python visualize_labels.py posenet models/coco_posenet.npz
