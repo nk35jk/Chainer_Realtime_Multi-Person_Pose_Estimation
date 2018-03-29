@@ -188,16 +188,17 @@ python visualize_labels.py posenet models/coco_posenet.npz
 
 An example of the completion result of PAFs is as follows.
 <div align="center">
-<img src="data/00018193.jpg" width="340">
-<img src="data/00018193_gt_pafs.jpg" width="340">
-<img src="data/00018193_comp_pafs.jpg" width="340">
+<img src="data/00018193.jpg" width="280">
+<img src="data/00018193_gt_pafs.jpg" width="280">
+<img src="data/00018193_comp_pafs.jpg" width="280">
 </div>
 
 ### Train with COCO dataset
 For each 1000 iterations, the recent weight parameters are saved as a weight file `model_iter_1000`.
 
-Specify `--distill` option to do normal distillation, `--comp` option to do label completion.
-教師モデルのパスは `entity.py` 内の `teacher_path` にて指定する。
+Use `--distill` option to do normal distillation, `--comp` option to do label completion.
+
+Specify path of teacher model with `teacher_path` in `entity.py`
 
 ```
 python train_coco_pose_estimation.py --gpu 0
