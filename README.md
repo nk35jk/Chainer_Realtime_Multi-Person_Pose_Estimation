@@ -39,7 +39,7 @@ This project is licensed under the terms of the <a href="LICENSE">license</a>.
 - OpenCV
 
 ## Convert Caffe model to Chainer model
-The authors of [the original implementation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) provide trained caffe model 
+The authors of [the original implementation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) provide trained caffe model
 which you can use to extract model weights.
 Execute the following commands to download the trained model and convert it to npz file:
 
@@ -59,7 +59,7 @@ Execute the following command with the weight parameter file and the image file 
 The resulting image will be saved as `result.png`.
 
 ```
-python pose_detector.py posenet models/coco_posenet.npz --img data/person.png 
+python pose_detector.py posenet models/coco_posenet.npz --img data/person.png
 ```
 
 
@@ -80,7 +80,7 @@ Similarly, execute the following command for face estimation.
 The resulting image will be saved as `result.png`.
 
 ```
-python face_detector.py facenet models/facenet.npz --img data/face.png 
+python face_detector.py facenet models/facenet.npz --img data/face.png
 ```
 
 
@@ -95,7 +95,7 @@ Similarly, execute the following command for hand estimation.
 The resulting image will be saved as `result.png`.
 
 ```
-python hand_detector.py handnet models/handnet.npz --img data/hand.png 
+python hand_detector.py handnet models/handnet.npz --img data/hand.png
 ```
 
 <div align="center">
@@ -179,8 +179,25 @@ Please confirm that you can see the correct PAFs, Heatmaps, and masks on the cli
 python coco_data_loader.py
 ```
 
+### Distillationにより補正したラベルの可視化
+Execute the following command to visualize labels completed with the teacher model. HTML file will be saved in `result/visualization/visualization.html`.
+
+```
+python visualize_labels.py posenet models/coco_posenet.npz
+```
+
+An example of the completion result of PAFs is as follows.
+<div align="center">
+<img src="data/00018193.jpg" width="340">
+<img src="data/00018193_gt_pafs.jpg" width="340">
+<img src="data/00018193_comp_pafs.jpg" width="340">
+</div>
+
 ### Train with COCO dataset
 For each 1000 iterations, the recent weight parameters are saved as a weight file `model_iter_1000`.
+
+Specify `--distill` option to do normal distillation, `--comp` option to do label completion.
+教師モデルのパスは `entity.py` 内の `teacher_path` にて指定する。
 
 ```
 python train_coco_pose_estimation.py --gpu 0
@@ -191,10 +208,20 @@ python train_coco_pose_estimation.py --gpu 0
 Execute the following command with your own trained weight parameter file and the image file as arguments for inference. The resulting image will be saved as `result.png`.
 
 ```
-python pose_detector.py posenet model_iter_1000 --img data/person.png 
+python pose_detector.py posenet model_iter_1000 --img data/person.png
 ```
 
+## モデルの評価
+Execute the following command to evaluate trained model with validation data.
 
+```
+python evaluate_coco.py posenet models/coco_posenet.npz
+```
+
+The evaluation results of each model is as follows.
+<p align="center">
+<img src="data/ap_curve.png" width="620">
+</p>
 
 
 ## Related repository
@@ -212,6 +239,3 @@ Please cite the original paper in your publications if it helps your research:
       booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
       year = {2017}
       }
-
-
-

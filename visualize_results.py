@@ -28,8 +28,6 @@ def parse_args():
     parser.add_argument('weights', help='weights file path')
     parser.add_argument('--stages', '-s', type=int, default=6, help='number of posenet stages')
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--mask', action='store_true')
-    parser.add_argument('--precise', action='store_true', default=True, help='precise inference')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -43,7 +41,7 @@ def test():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=True, stages=args.stages)
 
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
     eval_loader = CocoDataLoader(params['coco_dir'], coco_val, pose_detector.model.insize, mode='eval', n_samples=None)

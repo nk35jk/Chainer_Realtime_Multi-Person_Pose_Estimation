@@ -57,7 +57,7 @@ cd ..
 以下のコマンドで、訓練済み重みパラメータファイルと画像を指定してポーズの推論を行う。処理結果は`result.png`という画像ファイルに保存される。
 
 ```
-python pose_detector.py posenet models/coco_posenet.npz --img data/person.png 
+python pose_detector.py posenet models/coco_posenet.npz --img data/person.png
 ```
 
 GPUを使う場合は、--gpuオプションを付ける。
@@ -75,7 +75,7 @@ python pose_detector.py posenet models/coco_posenet.npz --img data/person.png --
 同様に、以下のコマンドで顔のランドマークの推論を行う。こちらも処理結果は`result.png`という画像ファイルに保存される。
 
 ```
-python face_detector.py facenet models/facenet.npz --img data/face.png 
+python face_detector.py facenet models/facenet.npz --img data/face.png
 ```
 
 
@@ -89,7 +89,7 @@ python face_detector.py facenet models/facenet.npz --img data/face.png
 同様に、以下のコマンドで手のランドマークの推論を行う。こちらも処理結果は`result.png`という画像ファイルに保存される。
 
 ```
-python hand_detector.py handnet models/handnet.npz --img data/hand.png 
+python hand_detector.py handnet models/handnet.npz --img data/hand.png
 ```
 
 <div align="center">
@@ -167,9 +167,28 @@ python gen_ignore_mask.py
 python coco_data_loader.py
 ```
 
+### Distillationにより補正したラベルの可視化
+以下のコマンドで、教師モデルの出力を用いて補正したラベルの可視化を行う。結果を可視化したHTMLファイルが`result/visualization/visualization.html`に保存される。
+
+```
+python visualize_labels.py posenet models/coco_posenet.npz
+```
+
+PAFsの補正結果例を以下に示す。
+<div align="center">
+<img src="data/00018193.jpg" width="340">
+<img src="data/00018193_gt_pafs.jpg" width="340">
+<img src="data/00018193_comp_pafs.jpg" width="340">
+</div>
+
+
 ### COCOデータセットで訓練
 
 1000イテレーションごとに、その時点の重みパラメータが `model_iter_1000` というような重みファイルに保存される。
+
+通常のDistillationを `--distill` で、教師ラベル補正を `--comp` オプションで行うことができる。
+
+教師モデルのパスは `entity.py` 内の `teacher_path` にて指定する。
 
 ```
 python train_coco_pose_estimation.py --gpu 0
@@ -180,10 +199,20 @@ python train_coco_pose_estimation.py --gpu 0
 自前で訓練したモデルを使って推論処理を行う場合は、同じように以下のコマンドで訓練済み重みパラメータファイルと画像を指定すれば良い。処理結果は`result.png`という画像ファイルに保存される。
 
 ```
-python pose_detector.py posenet model_iter_1000 --img data/person.png 
+python pose_detector.py posenet model_iter_1000 --img data/person.png
 ```
 
+## モデルの評価
+以下のコマンドで、Validationデータを用いたモデルの評価を行う。
 
+```
+python evaluate_coco.py posenet models/coco_posenet.npz
+```
+
+学習の経過に伴う各モデルの評価結果は次のようになった。
+<p align="center">
+<img src="data/ap_curve.png" width="620">
+</p>
 
 
 ## 関連リポジトリ
@@ -200,4 +229,3 @@ Please cite the paper in your publications if it helps your research:
       booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
       year = {2017}
       }
-	  

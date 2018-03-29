@@ -85,7 +85,7 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
 
             if args.comp:
-                """hard targetとsoft targetで絶対値が大きい方を学習ラベルとしても用いる"""
+                """hard targetとsoft targetで絶対値が大きい方を学習ラベルとして用いる"""
                 pafs_t_mag = stage_pafs_t[:, ::2]**2 + stage_pafs_t[:, 1::2]**2
                 pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=1)
                 pafs_teacher_mag = stage_pafs_teacher_comp[:, ::2]**2 + stage_pafs_teacher_comp[:, 1::2]**2
@@ -94,14 +94,6 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
 
                 stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]] = stage_heatmaps_teacher_comp[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]].copy()
                 stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]] = stage_heatmaps_teacher_comp[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]].copy()
-
-                # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
-                # plt.imshow(stage_heatmaps_teacher_comp[1, -1], vmin=0, vmax=1); plt.show()
-                # plt.imshow(stage_heatmaps_t[1, -1], vmin=0, vmax=1); plt.show()
-                #
-                # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
-                # plt.imshow(stage_pafs_teacher_comp[1, 7], vmin=-1, vmax=1); plt.show()
-                # plt.imshow(stage_pafs_t[1, 7], vmin=-1, vmax=1); plt.show()
 
             stage_pafs_t[stage_paf_masks == True] = pafs_y.data[stage_paf_masks == True]
             stage_heatmaps_t[stage_heatmap_masks == True] = heatmaps_y.data[stage_heatmap_masks == True]
