@@ -198,7 +198,7 @@ For each 1000 iterations, the recent weight parameters are saved as a weight fil
 
 Use `--distill` option to do normal distillation, `--comp` option to do label completion.
 
-Specify path of teacher model with `teacher_path` in `entity.py`
+Specify teacher model path with `teacher_path` in `entity.py`.
 
 ```
 python train_coco_pose_estimation.py --gpu 0
