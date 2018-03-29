@@ -179,7 +179,7 @@ Please confirm that you can see the correct PAFs, Heatmaps, and masks on the cli
 python coco_data_loader.py
 ```
 
-### Distillationにより補正したラベルの可視化
+### Visualize labels completed with distillation
 Execute the following command to visualize labels completed with the teacher model. HTML file will be saved in `result/visualization/visualization.html`.
 
 ```
@@ -211,7 +211,7 @@ Execute the following command with your own trained weight parameter file and th
 python pose_detector.py posenet model_iter_1000 --img data/person.png
 ```
 
-## モデルの評価
+## Evaluation
 Execute the following command to evaluate trained model with validation data.
 
 ```
