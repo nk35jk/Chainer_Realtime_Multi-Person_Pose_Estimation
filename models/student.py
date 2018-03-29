@@ -4,6 +4,8 @@ import chainer.links as L
 
 
 class Student(chainer.Chain):
+    """small network"""
+
     insize = 368
     downscale = pad = 8
 
@@ -33,8 +35,6 @@ class Student(chainer.Chain):
             self.conv5_7 = L.Convolution2D(128, limbs+joints, 1)
 
     def __call__(self, x):
-        heatmaps = []
-        pafs = []
         h = F.relu(self.conv1_1(x))
         h = F.relu(self.conv1_2(h))
         h = F.max_pooling_2d(h, 2, stride=2)
@@ -59,8 +59,8 @@ class Student(chainer.Chain):
         h = F.relu(self.conv5_6(h))
         h = self.conv5_7(h)
 
-        pafs.append(h[:, :self.limbs])
-        heatmaps.append(h[:, -self.joints:])
+        pafs = [h[:, :self.limbs]]
+        heatmaps = [h[:, -self.joints:]]
 
         return pafs, heatmaps
 
@@ -73,6 +73,5 @@ if __name__ == '__main__':
     chainer.config.train = False
 
     model = Student()
-    arr = np.random.rand(1, 3, model.insize, model.insize).astype('f')
-    st = time.time()
+    arr = np.random.randn(1, 3, model.insize, model.insize).astype('f')
     h1s, h2s = model(arr)

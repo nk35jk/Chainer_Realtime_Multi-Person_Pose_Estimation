@@ -22,30 +22,6 @@ chainer.config.enable_backprop = False
 chainer.config.train = False
 
 
-def overlay_heatmap(img, paf):
-    hue = (np.arctan2(paf[1], paf[0]) / np.pi) / -2 + 0.5
-    saturation = np.ones_like(hue)
-    value = np.sqrt(paf[0] ** 2 + paf[1] ** 2) * 2  # twiced
-    value[value > 1.0] = 1.0
-    hsv_paf = np.stack([hue*180, saturation*255, value*255]).transpose(1, 2, 0)
-    rgb_paf = cv2.cvtColor(hsv_paf.astype(np.uint8), cv2.COLOR_HSV2BGR)
-    img = cv2.addWeighted(img, 0.25, rgb_paf, 0.75, 0)
-    return img
-
-def overlay_heatmaps(img, heatmaps):
-    mix_heatmap = np.zeros((2,) + img.shape[:-1])
-    paf_flags = np.zeros(mix_heatmap.shape) # for constant paf
-
-    for paf in heatmaps.reshape((int(pafs.shape[0]/2), 2,) + heatmaps.shape[1:]):
-        paf_flags = paf != 0
-        paf_flags += np.broadcast_to(paf_flags[0] | paf_flags[1], paf.shape)
-        mix_heatmap += paf
-
-    mix_heatmap[paf_flags > 0] /= paf_flags[paf_flags > 0]
-    img = overlay_heatmap(img, mix_heatmap)
-    return img
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description='COCO evaluation')
     parser.add_argument('arch', choices=params['archs'].keys(), default='posenet', help='Model architecture')
@@ -59,14 +35,6 @@ def parse_args():
     params['downscale'] = params['archs'][args.arch].downscale
     params['pad'] = params['archs'][args.arch].pad
     params['inference_scales'] = [1]
-    return args
-
-
-if __name__ == '__main__':
-    args = parse_args()
-
-    params['min_keypoints'] = 5
-    params['min_area'] = 32 * 32
     params['insize'] = 368
     params['paf_sigma'] = 8
     params['heatmap_sigma'] = 7
@@ -74,6 +42,11 @@ if __name__ == '__main__':
     params['max_scale'] = 1
     params['max_rotate_degree'] = 0
     params['center_perterb_max'] = 0
+    return args
+
+
+if __name__ == '__main__':
+    args = parse_args()
 
     # img_ids = [326, 395, 459]  # trainのGTのラベルが適切でなさそうなもの
     img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
@@ -124,17 +97,17 @@ if __name__ == '__main__':
         img_to_show = resized_img.copy()
         # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask)
         img_to_show = data_loader.overlay_pafs(img_to_show, pafs)
-        cv2.imwrite(os.path.join(label_output_dir, '{:08d}_gt_paf.jpg'.format(img_id)), img_to_show)
+        # cv2.imwrite(os.path.join(label_output_dir, '{:08d}_gt_paf.jpg'.format(img_id)), img_to_show)
         img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:-1].max(axis=0))
 
         cv2.imshow('w', np.hstack([resized_img, img_to_show]))
-        cv2.imwrite(os.path.join(label_output_dir, '{:08d}_gt.jpg'.format(img_id)), img_to_show)
-        cv2.imwrite(os.path.join(label_output_dir, '{:08d}.jpg'.format(img_id)), resized_img)
-        # k = cv2.waitKey(1)
-        # if k == ord('q'):
-        #     sys.exit()
-        # elif k == ord('d'):
-        #     import ipdb; ipdb.set_trace()
+        # cv2.imwrite(os.path.join(label_output_dir, '{:08d}_gt.jpg'.format(img_id)), img_to_show)
+        # cv2.imwrite(os.path.join(label_output_dir, '{:08d}.jpg'.format(img_id)), resized_img)
+        k = cv2.waitKey(0)
+        if k == ord('q'):
+            sys.exit()
+        elif k == ord('d'):
+            import ipdb; ipdb.set_trace()
 
         poses, scores = pose_detector(img)
 

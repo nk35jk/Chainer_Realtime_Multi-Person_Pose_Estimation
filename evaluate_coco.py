@@ -1,4 +1,5 @@
 import os
+import sys
 import cv2
 import time
 import argparse
@@ -21,13 +22,16 @@ chainer.config.train = False
 
 def parse_args():
     parser = argparse.ArgumentParser(description='COCO evaluation')
-    parser.add_argument('arch', choices=params['archs'].keys(), default='posenet', help='Model architecture')
+    parser.add_argument('arch', choices=params['archs'].keys(),
+                        default='posenet', help='Model architecture')
     parser.add_argument('weights', help='weights file path')
-    parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--stages', '-s', type=int, default=6,
+                        help='number of stages of posenet')
+    parser.add_argument('--gpu', '-g', type=int, default=-1,
+                        help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--n_samples', type=int, default=100)
-    parser.add_argument('--vis', action='store_true', help='visualize results')
-    parser.add_argument('--stages', '-s', type=int, default=6, help='number of posenet stages')
-    parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
+    parser.add_argument('--vis', action='store_true',
+                        help='visualize inference results')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -36,18 +40,17 @@ def parse_args():
 
 
 def evaluate():
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu,
+                                 precise=True, stages=args.stages)
 
-    coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-    eval_loader = CocoDataLoader(params['coco_dir'], coco_val, pose_detector.model.insize, mode='eval', n_samples=None)
-
-    # cv2.namedWindow('results', cv2.WINDOW_NORMAL)
+    coco_val = COCO(os.path.join(params['coco_dir'],
+                                 'annotations/person_keypoints_val2017.json'))
+    eval_loader = CocoDataLoader(params['coco_dir'], coco_val,
+                                 params['inference_img_size'], mode='eval')
 
     res = []
     imgIds = []
-    # for i in range(len(eval_loader)):
     for i in range(args.n_samples):
-    # for i in [1]:
         img, annotations, img_id = eval_loader.get_example(i)
         print('{:4d}, img id = {}'.format(i, img_id))
 
@@ -73,32 +76,10 @@ def evaluate():
 
         if args.vis:
             img = draw_person_pose(img, poses)
-            cv2.imwrite('result/img/result_{:08d}.png'.format(img_id), img)
-
-            # for ann in annotations:
-            #     for joint in np.array(ann['keypoints']).reshape(-1, 3)[:, :2].astype('i'):
-            #         cv2.circle(img, tuple(joint.tolist()), 3, (0, 0, 255), -1)
-
             cv2.imshow('results', img)
             k = cv2.waitKey(1)
             if k == ord('q'):
-                exit()
-
-        # # GT (test)
-        # for ann in annotations:
-        #     if ann['num_keypoints'] > 0:
-        #         res_dict = {}
-        #         res_dict['category_id'] = 1
-        #         res_dict['image_id'] = img_id
-        #         res_dict['score'] = 0
-        #
-        #         k = np.array(ann['keypoints']).reshape(17, 3)
-        #         k[:, 0] += 1
-        #         k[:, 1] += 1
-        #         res_dict['keypoints'] = k.ravel()
-        #
-        #         # res_dict['keypoints'] = ann['keypoints']
-        #         res.append(res_dict)
+                sys.exit()
 
     cocoDt = coco_val.loadRes(res)
     cocoEval = COCOeval(coco_val, cocoDt, 'keypoints')
@@ -107,7 +88,9 @@ def evaluate():
     cocoEval.accumulate()
     cocoEval.summarize()
     ap = cocoEval.stats[0]
-    with open('{}/evaluation_results.txt'.format('/'.join(args.weights.split('/')[:-1])), 'a') as f:
+
+    path = '{}/evaluation_results.txt'.format('/'.join(args.weights.split('/')[:-1]))
+    with open(path, 'a') as f:
         f.write('{}, {}\n'.format(args.weights, ap))
 
 if __name__ == '__main__':

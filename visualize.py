@@ -39,21 +39,39 @@ def parse_args():
 
 
 def test():
-    output_dir = '{}/vis'.format('/'.join(args.weights.split('/')[:-1]))
+    output_dir = '{}/visualization'.format('/'.join(args.weights.split('/')[:-1]))
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
 
     coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-    eval_loader = CocoDataLoader(coco_val, pose_detector.model.insize, mode='eval', n_samples=None)
+    eval_loader = CocoDataLoader(params['coco_dir'], coco_val, pose_detector.model.insize, mode='eval', n_samples=None)
 
-    f = open(os.path.join(output_dir, 'vis.html'), 'w')
+    """save css file"""
+    with open(os.path.join(output_dir, 'style.css'), 'w') as f:
+        f.write(
+            '''
+            body {
+              white-space:nowrap;
+              font-family: "Hiragino Kaku Gothic ProN"
+            }
+            span {
+              display: inline-block;
+              width: 300px;
+              text-align: center;
+            }
+            img {
+              width: 300px;
+            }
+            '''
+        )
+
+    f = open(os.path.join(output_dir, 'visualization.html'), 'w')
     f.write('<head><link rel="stylesheet" type="text/css" href="style.css"></head>')
 
     all_res = []
     imgIds = []
-    # for i in range(len(eval_loader)):
     for i in range(100):
         res = []
 
@@ -91,8 +109,6 @@ def test():
             cocoEval.accumulate()
             cocoEval.summarize()
             ap = cocoEval.stats[0]
-
-        # import IPython; IPython.embed()
 
         """Save results and GT"""
         # heatmaps

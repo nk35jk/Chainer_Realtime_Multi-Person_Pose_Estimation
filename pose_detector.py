@@ -15,6 +15,7 @@ from models.CocoPoseNet import CocoPoseNet
 
 
 class PoseDetector(object):
+
     def __init__(self, arch=None, weights_file=None, model=None, device=-1, precise=False, stages=6):
         self.arch = arch
         self.precise = precise
@@ -99,17 +100,6 @@ class PoseDetector(object):
                 map_top[:, 1:] = heatmap[:, :-1]
                 map_bottom[:, :-1] = heatmap[:, 1:]
 
-                # old
-                # peaks_binary = xp.logical_and.reduce((
-                #     heatmap > params['heatmap_peak_thresh'],
-                #     heatmap > map_left,
-                #     heatmap > map_right,
-                #     heatmap > map_top,
-                #     heatmap > map_bottom,
-                # ))
-                # peaks = zip(xp.nonzero(peaks_binary)[1], xp.nonzero(peaks_binary)[0])  # [(x, y), (x, y)...]のpeak座標配列
-
-                # improved
                 xx, yy = xp.meshgrid(range(heatmap.shape[1]), range(heatmap.shape[0]))
                 cand_inds = heatmap > params['heatmap_peak_thresh']
                 candidates = heatmap[cand_inds]
@@ -247,7 +237,6 @@ class PoseDetector(object):
             for ind_a, ind_b, score in connections[:, :3]:
                 ind_a, ind_b = int(ind_a), int(ind_b)
 
-                # TODO: fix
                 joint_found_cnt = 0
                 joint_found_subset_index = [-1, -1]
                 for subset_ind, subset in enumerate(subsets):
@@ -255,7 +244,6 @@ class PoseDetector(object):
                     if subset[joint_a] == ind_a or subset[joint_b] == ind_b:
                         joint_found_subset_index[joint_found_cnt] = subset_ind
                         joint_found_cnt += 1
-                ###
 
                 if joint_found_cnt == 1: # そのconnectionのどちらかのjointをsubsetが持っている場合
                     found_subset = subsets[joint_found_subset_index[0]]
@@ -533,19 +521,8 @@ class PoseDetector(object):
             tmp_heatmap = tmp_heatmap[:padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1], :]
             heatmaps_sum += cv2.resize(tmp_heatmap, (orig_img_w, orig_img_h), interpolation=interpolation)
 
-            # tmp_heatmap = h2s[-1]
-            # tmp_heatmap = F.resize_images(tmp_heatmap, (x_data.shape[2], x_data.shape[3]))
-            # tmp_heatmap = tmp_heatmap[:, :, :padded_img.shape[0]-pad[0], :padded_img.shape[1]-pad[1]]
-            # heatmaps_sum += F.resize_images(tmp_heatmap, (orig_img_h, orig_img_w)).data[0]
-
         self.pafs = (pafs_sum / len(params['inference_scales'])).transpose(2, 0, 1)
         self.heatmaps = (heatmaps_sum / len(params['inference_scales'])).transpose(2, 0, 1)
-        # self.heatmaps = (heatmaps_sum / len(params['inference_scales']))
-
-        # plt.imshow(orig_img[..., ::-1])
-        # plt.imshow(self.heatmaps[2], alpha=.5, cmap='jet')
-        # plt.show()
-        # import ipdb; ipdb.set_trace()
 
         if self.device >= 0:
             self.pafs = cuda.to_cpu(self.pafs)
@@ -653,17 +630,15 @@ if __name__ == '__main__':
     # load model
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
 
-    # while True:
-    for i in range(20):
-        # read image
-        img = cv2.imread(args.img)
+    # read image
+    img = cv2.imread(args.img)
 
-        # inference
-        st = time.time()
-        poses, _ = pose_detector(img)
-        print('inference time: {:.2f}s, {} persons are detected.'.format(time.time() - st, len(poses)))
+    # inference
+    st = time.time()
+    poses, _ = pose_detector(img)
+    print('inference time: {:.2f}s, {} persons are detected.'.format(time.time() - st, len(poses)))
 
-        # draw and save image
-        img = draw_person_pose(img, poses)
-        print('Saving result into result.png...')
-        cv2.imwrite('result.png', img)
+    # draw and save image
+    img = draw_person_pose(img, poses)
+    print('Saving result into result.png...')
+    cv2.imwrite('result.png', img)

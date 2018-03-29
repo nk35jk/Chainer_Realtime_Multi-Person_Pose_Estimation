@@ -14,6 +14,7 @@ from entity import JointType, params
 
 
 class CocoDataLoader(DatasetMixin):
+
     def __init__(self, coco_dir, coco, insize, mode='train', n_samples=None):
         self.coco_dir = coco_dir
         self.coco = coco
@@ -369,29 +370,16 @@ class CocoDataLoader(DatasetMixin):
         resized_img, pafs, heatmaps, ignore_mask = self.generate_labels(img, poses, ignore_mask)
         return resized_img, pafs, heatmaps, ignore_mask
 
-if __name__ == '__main__':
-    params['min_keypoints'] = 5
-    params['min_area'] = 32 * 32
-    params['insize'] = 500
-    params['paf_sigma'] = 8
-    params['heatmap_sigma'] = 7
-    params['min_scale'] = 1
-    params['max_scale'] = 1
-    params['max_rotate_degree'] = 0
-    params['center_perterb_max'] = 0
-    # img_ids = [326, 395, 459]  # trainのGTのラベルが適切でなさそうなもの
-    img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
-               62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]  # valのGTのラベルが適切でなさそうなもの
 
-    mode = 'val'  # train, val, eval
+if __name__ == '__main__':
+    mode = 'val'  # train, val
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode)
 
     cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
     for i in range(len(data_loader)):
-        # img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
-        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(img_id=img_ids[i])
+        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
 
         print('\r{}'.format(img_id), end='')
 
@@ -412,26 +400,9 @@ if __name__ == '__main__':
             img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask)
 
             cv2.imshow('w', np.hstack([resized_img, img_to_show]))
-            cv2.imwrite('result/label_ex/{:08d}_gt.jpg'.format(img_ids[i]), np.hstack([resized_img, img_to_show]))
+            # cv2.imwrite('result/label_ex/{:08d}_gt.jpg'.format(img_ids[i]), np.hstack([resized_img, img_to_show]))
             k = cv2.waitKey(0)
             if k == ord('q'):
                 sys.exit()
             elif k == ord('d'):
                 import ipdb; ipdb.set_trace()
-
-
-# if __name__ == '__main__':
-#     """人物面積のヒストグラムを取得"""
-#
-#     params['min_keypoints'] = 0  # 5
-#     params['min_area'] = 0  # 32 * 32
-#
-#     mode = 'val'
-#     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
-#     data_loader = CocoDataLoader(coco, params['insize'], mode=mode)
-#
-#     areas = []
-#     for i in range(len(data_loader)):
-#         img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
-#         for ann in annotations:
-#             areas.append(ann['area'])

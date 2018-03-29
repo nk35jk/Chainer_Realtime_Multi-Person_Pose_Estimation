@@ -15,9 +15,9 @@ from entity import JointType, params
 from pose_detector import PoseDetector
 from pose_detector import draw_person_pose
 
-import chainer
-
 from hyperopt import hp, tpe, Trials, fmin
+
+import chainer
 
 chainer.config.enable_backprop = False
 chainer.config.train = False
@@ -25,15 +25,15 @@ chainer.config.train = False
 
 def parse_args():
     parser = argparse.ArgumentParser(description='COCO evaluation')
-    parser.add_argument('arch', choices=params['archs'].keys(), default='posenet', help='Model architecture')
+    parser.add_argument('arch', choices=params['archs'].keys(),
+                        default='posenet', help='model architecture')
     parser.add_argument('weights', help='weights file path')
-    parser.add_argument('--stages', '-s', type=int, default=6, help='number of posenet stages')
-    parser.add_argument('--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--precise', action='store_true', default=True, help='visualize results')
-    parser.add_argument('--mask', action='store_true')
-    parser.add_argument('--out', '-o', default='result', help='Output directory')
-    parser.set_defaults(precise=True)
-    parser.set_defaults(mask=False)
+    parser.add_argument('--stages', '-s', type=int, default=6,
+                        help='number of posenet stages')
+    parser.add_argument('--gpu', '-g', type=int, default=-1,
+                        help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--out', '-o', default='result',
+                        help='output directory')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -45,8 +45,10 @@ class Objective(object):
 
     def __init__(self, path):
         self.coco_val = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_val2017.json'))
-        self.eval_loader = CocoDataLoader(self.coco_val, params['inference_img_size'], mode='eval', n_samples=None)
-        self.pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
+        self.eval_loader = CocoDataLoader(
+            params['coco_dir'], self.coco_val, params['inference_img_size'],
+            mode='eval', n_samples=None)
+        self.pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=True, stages=args.stages)
         self.path = path
 
     def __call__(self, p):
@@ -55,15 +57,15 @@ class Objective(object):
 
         res = []
         imgIds = []
-        for i in range(1000, len(self.eval_loader)):
+        # for i in range(1000, len(self.eval_loader)):
+        for i in range(10):
             img, annotations, img_id = self.eval_loader.get_example(i)
 
             imgIds.append(img_id)
 
             st = time.time()
             poses, scores = self.pose_detector(img)
-            sys.stdout.write('\rinference: {:.2f}s'.format(time.time() - st))
-            # print('inference: {:.2f}s'.format(time.time() - st))
+            print('\rinference: {:.2f}s'.format(time.time() - st), end='')
 
             for pose, score in zip(poses, scores):
                 res_dict = {}
@@ -107,13 +109,13 @@ class Objective(object):
                 p['subset_score_thresh'],
             ))
 
-        return -(ap+ar)
+        return -ap
 
 
 if __name__ == '__main__':
     args = parse_args()
 
-    path = os.path.join(args.out, 'optimize_log_{}.csv'.format(args.arch))
+    path = os.path.join(args.out, 'hyperopt_log_{}.csv'.format(args.arch))
     with open(path, 'a') as f:
         f.write('AP, n_integ_points, n_integ_points_thresh, heatmap_peak_thresh, ' \
                 'inner_product_thresh, limbs_len_ratio, n_subset_limbs_thresh, ' \
@@ -131,7 +133,7 @@ if __name__ == '__main__':
         'subset_score_thresh': hp.uniform('subset_score_thresh', 0.05, 1),  # 0.4
     }
 
-    max_evals = 1000
+    max_evals = 3
 
     trials = Trials()
 

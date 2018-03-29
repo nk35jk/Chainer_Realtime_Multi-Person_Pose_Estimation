@@ -1,8 +1,7 @@
-import time
-import numpy as np
 import chainer
 import chainer.functions as F
 import chainer.links as L
+
 from chainer.links import caffe
 
 
@@ -20,6 +19,7 @@ def copy_vgg_params(model):
 
 
 class PoseNet(chainer.Chain):
+
     insize = 368
     downscale = pad = 8
 
@@ -144,12 +144,9 @@ if __name__ == '__main__':
     chainer.config.enable_backprop = False
     chainer.config.train = False
 
-    model = PoseNet()
-    arr = np.random.rand(1, 3, model.insize, model.insize).astype('f')
-    st = time.time()
-    h1s, h2s = model(arr)
+    import time
+    import numpy as np
 
-    import chainer.computational_graph as c
-    g = c.build_computational_graph([h1s[-1], h2s[-1]])
-    with open('graph.dot', 'w') as o:
-        o.write(g.dump())
+    model = PoseNet()
+    arr = np.random.randn(1, 3, model.insize, model.insize).astype('f')
+    h1s, h2s = model(arr)

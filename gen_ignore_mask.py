@@ -10,6 +10,7 @@ from entity import params
 
 
 class CocoDataLoader(object):
+
     def __init__(self, coco, mode='train'):
         self.coco = coco
         assert mode in ['train', 'val'], 'Data loading mode is invalid.'

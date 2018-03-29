@@ -355,24 +355,24 @@ def parse_args():
 
     parser.add_argument('--arch', '-a', choices=params['archs'].keys(),
                         default='posenet',
-                        help='Model architecture')
+                        help='model architecture')
     parser.add_argument('--stages', '-s', type=int, default=6,
                         help='number of posenet stages')
     parser.add_argument('--initmodel',
-                        help='Initialize the model from given file')
+                        help='initialize the model from given file')
 
     parser.add_argument('--batchsize', '-B', type=int, default=10,
-                        help='Learning minibatch size')
+                        help='learning minibatch size')
     parser.add_argument('--valbatchsize', '-b', type=int, default=4,
-                        help='Validation minibatch size')
+                        help='validation minibatch size')
     parser.add_argument('--iteration', '-i', type=int, default=240000,
-                        help='Number of iterations to train')
+                        help='number of iterations to train')
     parser.add_argument('--loaderjob', '-j', type=int,
-                        help='Number of parallel data loading processes')
+                        help='number of parallel data loading processes')
     parser.add_argument('--val_samples', type=int, default=100,
-                        help='Number of validation samples')
+                        help='number of validation samples')
     parser.add_argument('--eval_samples', type=int, default=100,
-                        help='Number of validation samples')
+                        help='number of validation samples')
     # parser.add_argument('--initial_lr', type=float, default=0.05)
     # parser.add_argument('--lr_decay_rate', type=float, default=0.1)
     # parser.add_argument('--lr_decay_iter', type=int, default=80000)
@@ -382,17 +382,17 @@ def parse_args():
                         help='GPU ID (negative value indicates CPU')
     parser.add_argument('--coco_dir')
     parser.add_argument('--out', '-o', default='result/test',
-                        help='Output directory')
+                        help='output directory')
     parser.add_argument('--resume', '-r', default='',
-                        help='Initialize the trainer from given file')
+                        help='initialize the trainer from given file')
 
     parser.add_argument('--distill', action='store_true')
     parser.add_argument('--only_soft', action='store_true',
-                        help='Train student model with only soft target')
+                        help='train student model with only soft target')
     parser.add_argument('--comp', action='store_true',
-                        help='Complement label with output of teacher model')
+                        help='complement label with output of teacher model')
     parser.add_argument('--modify', action='store_true',
-                        help='Modify output of teacher model for distillation' \
+                        help='modify output of teacher model for distillation' \
                         +'(not for label omplement)')
     parser.add_argument('--teacher_path', default=params['teacher_path'])
     parser.add_argument('--teacher_type', choices=params['teacher_types'],
