@@ -90,9 +90,9 @@ if __name__ == '__main__':
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode)
 
-    # pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=args.precise, stages=args.stages)
 
-    # cv2.namedWindow('w', cv2.WINDOW_NORMAL)
+    cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
     for img_id in img_ids:
         """GT"""
@@ -136,61 +136,61 @@ if __name__ == '__main__':
         # elif k == ord('d'):
         #     import ipdb; ipdb.set_trace()
 
-        # poses, scores = pose_detector(img)
-        #
-        # """Save results and GT"""
-        # # heatmaps
-        # for i, heatmap in enumerate(pose_detector.heatmaps):
-        #     rgb_heatmap = cv2.applyColorMap((heatmap.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
-        #     heatmap_img = cv2.addWeighted(img, 0.3, rgb_heatmap, 0.7, 0)
-        #     cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmap{}.jpg'.format(img_id, i)), heatmap_img)
-        #
-        # # # pafs (each)
-        # # for i, paf in enumerate(pose_detector.pafs):
-        # #     rgb_paf = cv2.applyColorMap((paf.clip(-1, 1)*127.5+127.5).astype(np.uint8), cv2.COLORMAP_JET)
-        # #     paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
-        # #     cv2.imwrite(os.path.join(output_dir, '{:08d}_paf{}.jpg'.format(img_id, i)), paf_img)
-        #
-        # # pafs (absolute value)
-        # abs_pafs = (pose_detector.pafs[::2]**2 + pose_detector.pafs[1::2]**2)**0.5
-        # for i, abs_paf in enumerate(abs_pafs):
-        #     rgb_paf = cv2.applyColorMap((abs_paf.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
+        poses, scores = pose_detector(img)
+
+        """Save results and GT"""
+        # heatmaps
+        for i, heatmap in enumerate(pose_detector.heatmaps):
+            rgb_heatmap = cv2.applyColorMap((heatmap.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
+            heatmap_img = cv2.addWeighted(img, 0.3, rgb_heatmap, 0.7, 0)
+            cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmap{}.jpg'.format(img_id, i)), heatmap_img)
+
+        # # pafs (each)
+        # for i, paf in enumerate(pose_detector.pafs):
+        #     rgb_paf = cv2.applyColorMap((paf.clip(-1, 1)*127.5+127.5).astype(np.uint8), cv2.COLORMAP_JET)
         #     paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
-        #     cv2.imwrite(os.path.join(output_dir, '{:08d}_abs_paf{}.jpg'.format(img_id, i)), paf_img)
-        #
-        # """ラベル補正"""
-        # xp = cuda.get_array_module(pose_detector.pafs)
-        # comp_pafs_t = pafs.copy()
-        # comp_heatmaps_t = heatmaps.copy()
-        # pafs_teacher = pose_detector.pafs.copy()
-        # heatmaps_teacher = pose_detector.heatmaps.copy()
-        # shape = comp_heatmaps_t.shape[1:]
-        # pafs_teacher = F.resize_images(pafs_teacher[None], shape).data[0]
-        # heatmaps_teacher = F.resize_images(heatmaps_teacher[None], shape).data[0]
-        # # pafs
-        # pafs_t_mag = comp_pafs_t[::2]**2 + comp_pafs_t[1::2]**2
-        # pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=0)
-        # pafs_teacher_mag = pafs_teacher[::2]**2 + pafs_teacher[1::2]**2
-        # pafs_teacher_mag = xp.repeat(pafs_teacher_mag, 2, axis=0)
-        # comp_pafs_t[pafs_t_mag < pafs_teacher_mag] = pafs_teacher[pafs_t_mag < pafs_teacher_mag]
-        # # heatmaps
-        # comp_heatmaps_t[:, :-1][comp_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]] = heatmaps_teacher[:, :-1][comp_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]].copy()
-        # comp_heatmaps_t[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]] = heatmaps_teacher[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]].copy()
-        #
-        # # overlay labels
-        # comp_img_to_show = resized_img.copy()
-        # # img_to_show = data_loader.overlay_ignore_mask(comp_img_to_show, ignore_mask)
-        # comp_img_to_show = data_loader.overlay_pafs(comp_img_to_show, comp_pafs_t)
-        # cv2.imwrite(os.path.join(label_output_dir, '{:08d}_comp_paf.jpg'.format(img_id)), comp_img_to_show)
-        # comp_img_to_show = data_loader.overlay_heatmap(comp_img_to_show, comp_heatmaps_t[:-1].max(axis=0))
-        #
-        # cv2.imshow('w', np.hstack([resized_img, comp_img_to_show]))
-        # cv2.imwrite(os.path.join(label_output_dir, '{:08d}_comp.jpg'.format(img_id)), comp_img_to_show)
-        # k = cv2.waitKey(1)
-        # if k == ord('q'):
-        #     sys.exit()
-        # elif k == ord('d'):
-        #     import ipdb; ipdb.set_trace()
+        #     cv2.imwrite(os.path.join(output_dir, '{:08d}_paf{}.jpg'.format(img_id, i)), paf_img)
+
+        # pafs (absolute value)
+        abs_pafs = (pose_detector.pafs[::2]**2 + pose_detector.pafs[1::2]**2)**0.5
+        for i, abs_paf in enumerate(abs_pafs):
+            rgb_paf = cv2.applyColorMap((abs_paf.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
+            paf_img = cv2.addWeighted(img, 0.3, rgb_paf, 0.7, 0)
+            cv2.imwrite(os.path.join(output_dir, '{:08d}_abs_paf{}.jpg'.format(img_id, i)), paf_img)
+
+        """ラベル補正"""
+        xp = cuda.get_array_module(pose_detector.pafs)
+        comp_pafs_t = pafs.copy()
+        comp_heatmaps_t = heatmaps.copy()
+        pafs_teacher = pose_detector.pafs.copy()
+        heatmaps_teacher = pose_detector.heatmaps.copy()
+        shape = comp_heatmaps_t.shape[1:]
+        pafs_teacher = F.resize_images(pafs_teacher[None], shape).data[0]
+        heatmaps_teacher = F.resize_images(heatmaps_teacher[None], shape).data[0]
+        # pafs
+        pafs_t_mag = comp_pafs_t[::2]**2 + comp_pafs_t[1::2]**2
+        pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=0)
+        pafs_teacher_mag = pafs_teacher[::2]**2 + pafs_teacher[1::2]**2
+        pafs_teacher_mag = xp.repeat(pafs_teacher_mag, 2, axis=0)
+        comp_pafs_t[pafs_t_mag < pafs_teacher_mag] = pafs_teacher[pafs_t_mag < pafs_teacher_mag]
+        # heatmaps
+        comp_heatmaps_t[:, :-1][comp_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]] = heatmaps_teacher[:, :-1][comp_heatmaps_t[:, :-1] < heatmaps_teacher[:, :-1]].copy()
+        comp_heatmaps_t[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]] = heatmaps_teacher[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]].copy()
+
+        # overlay labels
+        comp_img_to_show = resized_img.copy()
+        # img_to_show = data_loader.overlay_ignore_mask(comp_img_to_show, ignore_mask)
+        comp_img_to_show = data_loader.overlay_pafs(comp_img_to_show, comp_pafs_t)  # pafs_teacher comp_pafs_t
+        cv2.imwrite(os.path.join(label_output_dir, '{:08d}_comp_paf.jpg'.format(img_id)), comp_img_to_show)
+        comp_img_to_show = data_loader.overlay_heatmap(comp_img_to_show, comp_heatmaps_t[:-1].max(axis=0))
+
+        cv2.imshow('w', np.hstack([resized_img, comp_img_to_show]))
+        cv2.imwrite(os.path.join(label_output_dir, '{:08d}_comp.jpg'.format(img_id)), comp_img_to_show)
+        k = cv2.waitKey(1)
+        if k == ord('q'):
+            sys.exit()
+        elif k == ord('d'):
+            import ipdb; ipdb.set_trace()
 
         """heatmap peaks"""
         # joint_colors = [

@@ -37,7 +37,7 @@ class CocoDataLoader(DatasetMixin):
         value[value > 1.0] = 1.0
         hsv_paf = np.stack([hue*180, saturation*255, value*255]).transpose(1, 2, 0)
         rgb_paf = cv2.cvtColor(hsv_paf.astype(np.uint8), cv2.COLOR_HSV2BGR)
-        img = cv2.addWeighted(img, 0.4, rgb_paf, 0.6, 0)
+        img = cv2.addWeighted(img, 0.25, rgb_paf, 0.75, 0)
         return img
 
     def overlay_pafs(self, img, pafs):
