@@ -429,7 +429,7 @@ if __name__ == '__main__':
         chainer.serializers.load_npz(args.initmodel, model)
 
     # Prepare teacher model for distillation
-    if args.distill or args.comp_heat or comp_paf:
+    if args.distill or args.comp_heat or args.comp_paf:
         teacher = posenet.PoseNet()
         serializers.load_npz(args.teacher_path, teacher)
         teacher.disable_update()
@@ -440,7 +440,7 @@ if __name__ == '__main__':
     if args.gpu >= 0:
         chainer.cuda.get_device_from_id(args.gpu).use()
         model.to_gpu()
-        if args.distill or args.comp_heat or comp_paf:
+        if args.distill or args.comp_heat or args.comp_paf:
             teacher.to_gpu()
 
     # Set up an optimizer
