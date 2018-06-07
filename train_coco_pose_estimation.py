@@ -55,10 +55,13 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
 
     # compute loss on each stage
     for pafs_y, heatmaps_y in zip(pafs_ys, heatmaps_ys):
-        if args.distill or args.comp:
+        if args.distill:
             stage_pafs_teacher_distill = pafs_teacher.copy()
             stage_heatmaps_teacher_distill = heatmaps_teacher.copy()
+
+        if args.comp_paf:
             stage_pafs_teacher_comp = pafs_teacher.copy()
+        if args.comp_heat:
             stage_heatmaps_teacher_comp = heatmaps_teacher.copy()
 
         if args.distill and args.modify:
@@ -84,14 +87,16 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 stage_paf_masks = F.resize_images(stage_paf_masks.astype('f'), pafs_y.shape[2:]).data > 0
                 stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
 
-            if args.comp:
-                """hard targetとsoft targetで絶対値が大きい方を学習ラベルとして用いる"""
+            if args.comp_paf:
+                """pafsを補正"""
                 pafs_t_mag = stage_pafs_t[:, ::2]**2 + stage_pafs_t[:, 1::2]**2
                 pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=1)
                 pafs_teacher_mag = stage_pafs_teacher_comp[:, ::2]**2 + stage_pafs_teacher_comp[:, 1::2]**2
                 pafs_teacher_mag = xp.repeat(pafs_teacher_mag, 2, axis=1)
                 stage_pafs_t[pafs_t_mag < pafs_teacher_mag] = stage_pafs_teacher_comp[pafs_t_mag < pafs_teacher_mag]
 
+            if args.comp_heat:
+                """heatmapsを補正"""
                 stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]] = stage_heatmaps_teacher_comp[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]].copy()
                 stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]] = stage_heatmaps_teacher_comp[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]].copy()
 
@@ -381,8 +386,10 @@ def parse_args():
     parser.add_argument('--distill', action='store_true')
     parser.add_argument('--only_soft', action='store_true',
                         help='train student model with only soft target')
-    parser.add_argument('--comp', action='store_true',
-                        help='complement label with output of teacher model')
+    parser.add_argument('--comp_heat', action='store_true',
+                        help='complete heatmap labels with output of teacher model')
+    parser.add_argument('--comp_paf', action='store_true',
+                        help='complete paf labels with output of teacher model')
     parser.add_argument('--modify', action='store_true',
                         help='modify output of teacher model for distillation' \
                         +'(not for label omplement)')
@@ -422,7 +429,7 @@ if __name__ == '__main__':
         chainer.serializers.load_npz(args.initmodel, model)
 
     # Prepare teacher model for distillation
-    if args.distill or args.comp:
+    if args.distill or args.comp_heat or comp_paf:
         teacher = posenet.PoseNet()
         serializers.load_npz(args.teacher_path, teacher)
         teacher.disable_update()
@@ -433,7 +440,7 @@ if __name__ == '__main__':
     if args.gpu >= 0:
         chainer.cuda.get_device_from_id(args.gpu).use()
         model.to_gpu()
-        if args.distill or args.comp:
+        if args.distill or args.comp_heat or comp_paf:
             teacher.to_gpu()
 
     # Set up an optimizer
