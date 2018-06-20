@@ -236,9 +236,11 @@ if __name__ == '__main__':
         for ann in annotations:
             for x, y, v in np.array(ann['keypoints']).reshape(-1, 3):
                 if v == 1:
-                    cv2.circle(gt_img, (x, y), 4, (255, 255, 0), -1)
+                    # cv2.circle(gt_img, (x, y), 4, (255, 255, 0), -1)
+                    cv2.circle(gt_img, (x, y), 8, (0, 255, 0), -1)
                 elif v == 2:
-                    cv2.circle(gt_img, (x, y), 4, (255, 0, 255), -1)
+                    # cv2.circle(gt_img, (x, y), 4, (255, 0, 255), -1)
+                    cv2.circle(gt_img, (x, y), 8, (0, 255, 0), -1)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_joints.jpg'.format(img_id)), gt_img)
 
         """write html"""

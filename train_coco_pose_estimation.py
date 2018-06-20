@@ -136,7 +136,7 @@ def preprocess(imgs):
     if args.arch in ['posenet', 'student']:
         x_data /= 255
         x_data -= 0.5
-    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'cpn', 'mobilenet']:
+    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'cpn', 'mobilenet', 'resnet50', 'resnet101', 'resnet152']:
         x_data -= xp.array([104, 117, 123])
     x_data = x_data.transpose(0, 3, 1, 2)
     return x_data
@@ -159,7 +159,7 @@ class Updater(StandardUpdater):
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
+            elif args.arch in ['resnetfpn', 'pspnet', 'cpn', 'resnet50', 'resnet101', 'resnet152']:
                 optimizer.target.res.enable_update()
             elif args.arch in ['nn1']:
                 model.squeeze.enable_update()
@@ -377,7 +377,7 @@ def parse_args():
     parser.add_argument('--log_iter', type=int, default=20)
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
-    parser.add_argument('--coco_dir')
+    parser.add_argument('--coco_dir', help='path of COCO dataset directory')
     parser.add_argument('--out', '-o', default='result/test',
                         help='output directory')
     parser.add_argument('--resume', '-r', default='',
@@ -398,6 +398,8 @@ def parse_args():
                         default='single')
 
     parser.add_argument('--test', action='store_true')
+    parser.add_argument('--use_all_images', action='store_true')
+    parser.add_argument('--use_ignore_mask', type=int, choices=(0, 1), default=1)
 
     args = parser.parse_args()
     return args
@@ -444,7 +446,7 @@ if __name__ == '__main__':
             teacher.to_gpu()
 
     # Set up an optimizer
-    # optimizer = optimizers.MomentumSGD(lr=1e-3, momentum=0.9)
+    # optimizer = optimizers.MomentumSGD(lr=5e-4, momentum=0.9)
     optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
     # optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
@@ -470,8 +472,13 @@ if __name__ == '__main__':
     coco_dir = args.coco_dir or params['coco_dir']
     coco_train = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_val2017.json'))
-    train_loader = CocoDataLoader(coco_dir, coco_train, model.insize, mode='train')
-    val_loader = CocoDataLoader(coco_dir, coco_val, model.insize, mode='val', n_samples=args.val_samples)
+    train_loader = CocoDataLoader(coco_dir, coco_train, model.insize, mode='train',
+                                  use_all_images=args.use_all_images,
+                                  use_ignore_mask=args.use_ignore_mask)
+    val_loader = CocoDataLoader(coco_dir, coco_val, model.insize, mode='val',
+                                n_samples=args.val_samples,
+                                use_ignore_mask=args.use_ignore_mask,
+                                use_all_images=args.use_all_images)
     # eval_loader = CocoDataLoader(coco_dir, coco_val, model, mode='eval', n_samples=args.eval_samples)
 
     # Set up iterators

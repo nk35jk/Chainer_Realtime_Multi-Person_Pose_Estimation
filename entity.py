@@ -4,6 +4,7 @@ from models.CocoPoseNet import CocoPoseNet
 from models.posenet import PoseNet
 from models.nn1 import NN1
 from models.resnetfpn import ResNetFPN
+from models.resnet import ResNet50, ResNet101, ResNet152
 from models.pspnet import PSPNet
 from models.student import Student
 from models.cpn import CPN
@@ -61,6 +62,9 @@ params = {
         'handnet': HandNet,
         'nn1': NN1,
         'resnetfpn': ResNetFPN,
+        'resnet50': ResNet50,
+        'resnet101': ResNet101,
+        'resnet152': ResNet152,
         'pspnet': PSPNet,
         'student': Student,
         'cpn': CPN,
@@ -76,10 +80,10 @@ params = {
 
     'min_box_size': 64,
     'max_box_size': 512,
-    'min_scale': 0.5,
-    'max_scale': 2.0,
-    'max_rotate_degree': 40,
-    'center_perterb_max': 40,
+    'min_scale': 0.7,
+    'max_scale': 1.3,
+    'max_rotate_degree': 30,
+    'center_perterb_max': 60,
 
     'teacher_path': 'models/posenet_190k_ap_0.544.npz',
     'teacher_types': ['single', 'multi_avg', 'multi_max'],
