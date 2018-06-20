@@ -442,6 +442,8 @@ if __name__ == '__main__':
     if args.gpu >= 0:
         chainer.cuda.get_device_from_id(args.gpu).use()
         model.to_gpu()
+        if args.arch in ['resnet50', 'resnet101', 'resnet152']:
+            model.res.to_gpu()
         if args.distill or args.comp_heat or args.comp_paf:
             teacher.to_gpu()
 
