@@ -416,6 +416,8 @@ if __name__ == '__main__':
     # Prepare model
     if args.arch == 'posenet':
         model = params['archs'][args.arch](stages=args.stages)
+    elif args.arch in ['resnet50', 'resnet101', 'resnet152']:
+        model = params['archs'][args.arch](device=args.gpu)
     else:
         model = params['archs'][args.arch]()
 
