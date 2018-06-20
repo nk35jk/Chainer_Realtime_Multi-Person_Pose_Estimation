@@ -9,7 +9,7 @@ class ResNet(chainer.Chain):
     insize = 368
     downscale = pad = 8
 
-    def __init__(self, joints=19, limbs=38, layers=50, device=-1):
+    def __init__(self, joints=19, limbs=38, layers=50):
         super(ResNet, self).__init__()
         self.joints = joints
         self.limbs = limbs
@@ -19,8 +19,6 @@ class ResNet(chainer.Chain):
             self.res = ResNet101Layers()
         elif layers == 152:
             self.res = ResNet152Layers()
-        if device >= 0:
-            self.res.to_gpu(device)
         with self.init_scope():
             self.head1 = L.Convolution2D(2048, 512, 1)
             self.head2 = L.Convolution2D(512, 512, 3, 1, 1)
@@ -57,20 +55,20 @@ class ResNet(chainer.Chain):
 
 class ResNet50(ResNet):
 
-    def __init__(self, joints=19, limbs=38, device=-1):
-        super(ResNet50, self).__init__(joints, limbs, layers=50, device=-1)
+    def __init__(self, joints=19, limbs=38):
+        super(ResNet50, self).__init__(joints, limbs, layers=50)
 
 
 class ResNet101(ResNet):
 
-    def __init__(self, joints=19, limbs=38, device=-1):
-        super(ResNet101, self).__init__(joints, limbs, layers=101, device=-1)
+    def __init__(self, joints=19, limbs=38):
+        super(ResNet101, self).__init__(joints, limbs, layers=101)
 
 
 class ResNet152(ResNet):
 
-    def __init__(self, joints=19, limbs=38, device=-1):
-        super(ResNet152, self).__init__(joints, limbs, layers=152, device=-1)
+    def __init__(self, joints=19, limbs=38):
+        super(ResNet152, self).__init__(joints, limbs, layers=152)
 
 
 if __name__ == '__main__':
