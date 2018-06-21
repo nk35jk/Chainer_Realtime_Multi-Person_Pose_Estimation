@@ -356,7 +356,7 @@ def parse_args():
                         help='learning minibatch size')
     parser.add_argument('--valbatchsize', '-b', type=int, default=4,
                         help='validation minibatch size')
-    parser.add_argument('--iteration', '-i', type=int, default=240000,
+    parser.add_argument('--iteration', '-i', type=int, default=300000,
                         help='number of iterations to train')
     parser.add_argument('--loaderjob', '-j', type=int,
                         help='number of parallel data loading processes')
