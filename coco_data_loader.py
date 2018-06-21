@@ -252,9 +252,11 @@ class CocoDataLoader(DatasetMixin):
 
         return aug_img, ignore_mask, poses
 
-    # return shape: (height, width)
-    def generate_gaussian_heatmap(self, shape, joint, sigma):
-        x, y = joint
+    def generate_heatmap(self, shape, joint, sigma):
+        """return shape: (height, width)"""
+        x, y, v = joint
+        if v == 0:
+            return np.zeros(shape)
         grid_x = np.tile(np.arange(shape[1]), (shape[0], 1))
         grid_y = np.tile(np.arange(shape[0]), (shape[1], 1)).transpose()
         grid_distance = (grid_x - x) ** 2 + (grid_y - y) ** 2
@@ -263,23 +265,36 @@ class CocoDataLoader(DatasetMixin):
 
     def generate_heatmaps(self, img, poses, heatmap_sigma):
         heatmaps = np.zeros((0,) + img.shape[:-1])
-        sum_heatmap = np.zeros(img.shape[:-1])
+        heatmap_max = np.zeros(img.shape[:-1])
         for joint_index in range(len(JointType)):
             heatmap = np.zeros(img.shape[:-1])
             for pose in poses:
                 if pose[joint_index, 2] > 0:
-                    jointmap = self.generate_gaussian_heatmap(img.shape[:-1], pose[joint_index][:2], heatmap_sigma)
+                    jointmap = self.generate_heatmap(img.shape[:-1], pose[joint_index], heatmap_sigma)
                     heatmap[jointmap > heatmap] = jointmap[jointmap > heatmap]
-                    sum_heatmap[jointmap > sum_heatmap] = jointmap[jointmap > sum_heatmap]
+                    heatmap_max[jointmap > heatmap_max] = jointmap[jointmap > heatmap_max]
             heatmaps = np.vstack((heatmaps, heatmap.reshape((1,) + heatmap.shape)))
-        bg_heatmap = 1 - sum_heatmap  # background channel
+        bg_heatmap = 1 - heatmap_max # background channel
         heatmaps = np.vstack((heatmaps, bg_heatmap[None]))
         return heatmaps.astype('f')
 
-    def generate_constant_paf(self, shape, joint_from, joint_to, paf_sigma):
+    def generate_heatmaps2(self, img, poses, heatmap_sigma):
+        heatmaps = np.zeros((len(JointType),) + img.shape[:-1])
+
+        if len(poses) > 0:
+            jointmaps = []
+            for pose in poses:
+                jointmaps.append(np.stack([self.generate_heatmap(img.shape[:-1], pose[i], heatmap_sigma) for i in range(len(JointType))]))
+            heatmaps = np.array(jointmaps).max(axis=0)
+
+        bg_heatmap = 1 - heatmaps.max(axis=0) # background channel
+        heatmaps = np.vstack((heatmaps, bg_heatmap[None]))
+        return heatmaps.astype('f')
+
+    def generate_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
         """return shape: (2, height, width)"""
         if np.array_equal(joint_from, joint_to): # same joint
-            return np.zeros((2,) + shape[:-1])
+            return np.zeros((2,) + shape)
 
         joint_distance = np.linalg.norm(joint_to - joint_from)
         unit_vector = (joint_to - joint_from) / joint_distance
@@ -293,29 +308,34 @@ class CocoDataLoader(DatasetMixin):
         vertical_inner_product = vertical_unit_vector[0] * (grid_x - joint_from[0]) + vertical_unit_vector[1] * (grid_y - joint_from[1])
         vertical_paf_flag = np.abs(vertical_inner_product) <= paf_sigma
         paf_flag = horizontal_paf_flag & vertical_paf_flag
-        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape[:-1] + (2,)).transpose(2, 0, 1)
+        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape + (2,)).transpose(2, 0, 1)
         return constant_paf
 
-    def generate_round_constant_paf(self, shape, joint_from, joint_to, paf_sigma):
+    def generate_round_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
         """return shape: (2, height, width)"""
-        if np.array_equal(joint_from, joint_to): # same joint
-            return np.zeros((2,) + shape[:-1])
+        v_from = joint_from[-1]
+        v_to = joint_to[-1]
+        joint_from = joint_from[:-1]
+        joint_to = joint_to[:-1]
+
+        if np.array_equal(joint_from, joint_to) or v_from == 0 or v_to == 0: # same joint
+            return np.zeros((2,) + shape)
 
         joint_distance = np.linalg.norm(joint_to - joint_from)
         unit_vector = (joint_to - joint_from) / joint_distance
         rad = np.pi / 2
         rot_matrix = np.array([[np.cos(rad), np.sin(rad)], [-np.sin(rad), np.cos(rad)]])
         vertical_unit_vector = np.dot(rot_matrix, unit_vector)
-        grid_x = np.tile(np.arange(shape[1]), (shape[0], 1))
-        grid_y = np.tile(np.arange(shape[0]), (shape[1], 1)).transpose()
-        horizontal_inner_product = unit_vector[0] * (grid_x - joint_from[0]) + unit_vector[1] * (grid_y - joint_from[1])
-        horizontal_paf_flag = (0 <= horizontal_inner_product) & (horizontal_inner_product <= joint_distance)
-        close_to_joint_from = ((joint_from[0] - grid_x)**2 + (joint_from[1] - grid_y)**2)**0.5 < paf_sigma
-        close_to_joint_to = ((joint_to[0] - grid_x)**2 + (joint_to[1] - grid_y)**2)**0.5 < paf_sigma
-        vertical_inner_product = vertical_unit_vector[0] * (grid_x - joint_from[0]) + vertical_unit_vector[1] * (grid_y - joint_from[1])
-        vertical_paf_flag = np.abs(vertical_inner_product) <= paf_sigma
-        paf_flag = horizontal_paf_flag & vertical_paf_flag | close_to_joint_from | close_to_joint_to
-        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape[:-1] + (2,)).transpose(2, 0, 1)
+        grid_x = np.tile(np.arange(shape[1]), (shape[0], 1)).astype('i')
+        grid_y = np.tile(np.arange(shape[0]), (shape[1], 1)).transpose().astype('i')
+        horizontal_inner_product = unit_vector[0] * (grid_x - joint_from[0]) + unit_vector[1] * (grid_y - joint_from[1]) # 730
+        horizontal_paf_flag = (0 <= horizontal_inner_product) & (horizontal_inner_product <= joint_distance) # 80
+        close_to_joint_from = ((joint_from[0] - grid_x)**2 + (joint_from[1] - grid_y)**2)**0.5 < paf_sigma # 3300
+        close_to_joint_to = ((joint_to[0] - grid_x)**2 + (joint_to[1] - grid_y)**2)**0.5 < paf_sigma # 3300
+        vertical_inner_product = vertical_unit_vector[0] * (grid_x - joint_from[0]) + vertical_unit_vector[1] * (grid_y - joint_from[1]) # 820
+        vertical_paf_flag = np.abs(vertical_inner_product) <= paf_sigma # 90
+        paf_flag = horizontal_paf_flag & vertical_paf_flag | close_to_joint_from | close_to_joint_to # 33
+        constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape + (2,)).transpose(2, 0, 1) # 220
         return constant_paf
 
     def generate_pafs(self, img, poses, paf_sigma):
@@ -323,18 +343,36 @@ class CocoDataLoader(DatasetMixin):
 
         for limb in params['limbs_point']:
             paf = np.zeros((2,) + img.shape[:-1])
-            paf_flags = np.zeros(paf.shape) # for constant paf
+            paf_flags = np.zeros(paf.shape)
 
             for pose in poses:
                 joint_from, joint_to = pose[limb]
                 if joint_from[2] > 0 and joint_to[2] > 0:
-                    limb_paf = self.generate_round_constant_paf(img.shape, joint_from[:2], joint_to[:2], paf_sigma)
+                    limb_paf = self.generate_round_constant_paf(img.shape[:-1], joint_from, joint_to, paf_sigma)
                     limb_paf_flags = limb_paf != 0
                     paf_flags += np.broadcast_to(limb_paf_flags[0] | limb_paf_flags[1], limb_paf.shape)
                     paf += limb_paf
 
             paf[paf_flags > 0] /= paf_flags[paf_flags > 0]
             pafs = np.vstack((pafs, paf))
+        return pafs.astype('f')
+
+    def generate_pafs2(self, img, poses, paf_sigma):
+        pafs = np.zeros((len(params['limbs_point'])*2,) + img.shape[:-1])
+        pafs_flag = np.zeros((len(params['limbs_point'])*2,) + img.shape[:-1]).astype('i')
+        for pose in poses:
+            joint_froms, joint_tos = [], []
+            for limb in params['limbs_point']:
+                joint_pair = pose[limb]
+                joint_froms.append(joint_pair[0])
+                joint_tos.append(joint_pair[1])
+
+            tmp_pafs = np.concatenate([self.generate_round_constant_paf(img.shape[:-1],from_, to, paf_sigma)
+                                       for from_, to in zip(joint_froms, joint_tos)])
+            pafs += tmp_pafs
+            pafs_flag += tmp_pafs != 0
+
+        pafs[pafs_flag > 0] /= pafs_flag[pafs_flag > 0]
         return pafs.astype('f')
 
     def get_img_annotation(self, ind=None, img_id=None):
@@ -347,9 +385,10 @@ class CocoDataLoader(DatasetMixin):
         person_cnt = 0
         valid_annotations = []
         if len(anno_ids) > 0:
-            annotations_for_img = self.coco.loadAnns(anno_ids)
+            annotations = self.coco.loadAnns(anno_ids)
 
-            for ann in annotations_for_img:
+            for ann in annotations:
+                # import ipdb; ipdb.set_trace()
                 # if too few keypoints or too small
                 if ann['num_keypoints'] >= params['min_keypoints'] and ann['area'] > params['min_area']:
                     person_cnt += 1
@@ -370,7 +409,7 @@ class CocoDataLoader(DatasetMixin):
             ignore_mask = ignore_mask == 255
 
         if self.mode == 'eval':
-            return img, img_id, annotations_for_img, ignore_mask
+            return img, img_id, annotations, ignore_mask
         return img, img_id, valid_annotations, ignore_mask
 
     def parse_coco_annotation(self, annotations):
@@ -403,8 +442,10 @@ class CocoDataLoader(DatasetMixin):
         img, ignore_mask, poses = self.augment_data(img, ignore_mask, poses)
         resized_img, ignore_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape=(self.insize, self.insize))
 
-        heatmaps = self.generate_heatmaps(resized_img, resized_poses, params['heatmap_sigma'])
-        pafs = self.generate_pafs(resized_img, resized_poses, params['paf_sigma'])
+        # TODO: 人物のスケールを求める
+        scale = 1
+        heatmaps = self.generate_heatmaps2(resized_img, resized_poses, params['heatmap_sigma']*scale)
+        pafs = self.generate_pafs2(resized_img, resized_poses, params['paf_sigma']*scale)
         ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
         return resized_img, pafs, heatmaps, ignore_mask
 
@@ -461,15 +502,16 @@ if __name__ == '__main__':
 
             sum_paf_avg_norm += paf_avg_norm
             sum_heatmap_avg_norm += heatmap_avg_norm
-            print('{:.3f}'.format(sum_paf_avg_norm))
-            print('{:.3f}'.format(sum_heatmap_avg_norm))
+            # print('{:.3f}'.format(sum_paf_avg_norm))
+            # print('{:.3f}'.format(sum_heatmap_avg_norm))
 
             # overlay labels
             img_to_show = resized_img.copy()
-            img_to_show = data_loader.overlay_pafs(img_to_show, pafs, 0.3, 0.7)
-            img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:-1].max(axis=0), 0.5, 0.5)
-            img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, 0.3, 0.7)
+            img_to_show = data_loader.overlay_pafs(img_to_show, pafs, .2, .8)
+            # img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:-1].max(axis=0), .5, .5)
+            # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
 
+            # cv2.imshow('w', np.hstack([resized_img, img_to_show]))
             cv2.imshow('w', np.hstack([resized_img, img_to_show]))
             # cv2.imwrite('result/label_ex/{:08d}_gt.jpg'.format(img_ids[i]), np.hstack([resized_img, img_to_show]))
             k = cv2.waitKey(1)
