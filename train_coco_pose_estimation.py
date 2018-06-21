@@ -153,7 +153,7 @@ class Updater(StandardUpdater):
         optimizer = self.get_optimizer('main')
 
         # Update base network parameters
-        if self.iteration == 2000:
+        if self.iteration == 4000:
             if args.arch == 'posenet':
                 layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
@@ -163,11 +163,6 @@ class Updater(StandardUpdater):
                 optimizer.target.res.enable_update()
             elif args.arch in ['nn1']:
                 optimizer.target.squeeze.enable_update()
-
-        if 100000 <= self.iteration < 200000:
-            optimizer.alpha = 1e-5
-        elif 200000 <= self.iteration:
-            optimizer.alpha = 1e-6
 
         batch = train_iter.next()
 
@@ -370,11 +365,17 @@ def parse_args():
                         help='number of validation samples')
     parser.add_argument('--eval_samples', type=int, default=100,
                         help='number of validation samples')
-    # parser.add_argument('--initial_lr', type=float, default=0.05)
-    # parser.add_argument('--lr_decay_rate', type=float, default=0.1)
-    # parser.add_argument('--lr_decay_iter', type=int, default=80000)
+    parser.add_argument('--opt', choices=('adam', 'sgd'), default='adam')
+
+    parser.add_argument('--initial_lr', type=float, default=5e-4)
+    parser.add_argument('--lr_decay_rate', type=float, default=0.5)
+    parser.add_argument('--lr_decay_iter', type=int, default=50000)
+    # openpoes/cifar: 5e-4, CPN: 1e-5
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
+
     parser.add_argument('--val_iter', type=int, default=1000)
     parser.add_argument('--log_iter', type=int, default=20)
+    parser.add_argument('--save_iter', type=int, default=2000)
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
     parser.add_argument('--coco_dir', help='path of COCO dataset directory')
@@ -383,6 +384,7 @@ def parse_args():
     parser.add_argument('--resume', '-r', default='',
                         help='initialize the trainer from given file')
 
+    # distillation params
     parser.add_argument('--distill', action='store_true')
     parser.add_argument('--only_soft', action='store_true',
                         help='train student model with only soft target')
@@ -397,9 +399,9 @@ def parse_args():
     parser.add_argument('--teacher_type', choices=params['teacher_types'],
                         default='single')
 
-    parser.add_argument('--test', action='store_true')
     parser.add_argument('--use_all_images', action='store_true')
     parser.add_argument('--use_ignore_mask', type=int, choices=(0, 1), default=1)
+    parser.add_argument('--test', action='store_true')
 
     args = parser.parse_args()
     return args
@@ -446,10 +448,14 @@ if __name__ == '__main__':
             teacher.to_gpu()
 
     # Set up an optimizer
-    # optimizer = optimizers.MomentumSGD(lr=5e-4, momentum=0.9)
-    optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
+    if args.opt == 'sgd':
+        optimizer = optimizers.MomentumSGD(lr=args.initial_lr, momentum=0.9)
+    elif args.opt == 'adam':
+        optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
     optimizer.setup(model)
-    # optimizer.add_hook(chainer.optimizer.WeightDecay(1e-5))
+    if args.opt == 'sgd':
+        optimizer.add_hook(chainer.optimizer.WeightDecay(args.weight_decay))
+
     if args.arch == 'posenet':
         layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                        'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
@@ -510,19 +516,24 @@ if __name__ == '__main__':
                    trigger=val_interval)
     # trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
     #                trigger=val_interval)
-    # trainer.extend(extensions.ExponentialShift(
-    # 'lr', args.lr_decay_rate), trigger=(args.lr_decay_iter, 'iteration'))
-    # trainer.extend(extensions.dump_graph('main/loss'))
-    if not args.test:
-        trainer.extend(extensions.snapshot(), trigger=(2000, 'iteration'))
-        trainer.extend(extensions.snapshot_object(
-            model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
     trainer.extend(extensions.LogReport(trigger=log_interval))
+    trainer.extend(extensions.observe_lr())
+    trainer.extend(extensions.ExponentialShift(
+        'lr' if args.opt == 'sgd' else 'alpha', args.lr_decay_rate),
+        trigger=(args.lr_decay_iter, 'iteration'))
+    trainer.extend(extensions.dump_graph('main/loss'))
+    trainer.extend(extensions.ProgressBar(update_interval=1))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
-        'main/heat', 'val/heat',#'AP', 'AR'
+        'main/heat', 'val/heat', 'lr' #'AP', 'AR'
     ]), trigger=log_interval)
-    trainer.extend(extensions.ProgressBar(update_interval=1))
+    trainer.extend(extensions.PlotReport(
+        ['main/loss', 'val/loss'], x_key='iteration', file_name='loss.png'))
+
+    if not args.test:
+        trainer.extend(extensions.snapshot(), trigger=(args.save_iter, 'iteration'))
+        trainer.extend(extensions.snapshot_object(
+            model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
