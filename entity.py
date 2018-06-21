@@ -80,7 +80,7 @@ params = {
 
     'min_box_size': 64,
     'max_box_size': 512,
-    'min_scale': 0.7,
+    'min_scale': 0.5,
     'max_scale': 1.3,
     'max_rotate_degree': 30,
     'center_perterb_max': 60,
