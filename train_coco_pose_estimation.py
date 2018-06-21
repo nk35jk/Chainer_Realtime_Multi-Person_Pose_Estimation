@@ -525,7 +525,7 @@ if __name__ == '__main__':
     trainer.extend(extensions.ProgressBar(update_interval=1))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
-        'main/heat', 'val/heat', 'lr' #'AP', 'AR'
+        'main/heat', 'val/heat' #'AP', 'AR'
     ]), trigger=log_interval)
     trainer.extend(extensions.PlotReport(
         ['main/loss', 'val/loss'], x_key='iteration', file_name='loss.png'))
