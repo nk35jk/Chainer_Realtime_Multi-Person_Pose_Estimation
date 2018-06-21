@@ -9,17 +9,13 @@ class ResNet(chainer.Chain):
     insize = 368
     downscale = pad = 8
 
-    def __init__(self, joints=19, limbs=38, layers=50):
+    def __init__(self, joints=19, limbs=38, res=ResNet50Layers):
         super(ResNet, self).__init__()
         self.joints = joints
         self.limbs = limbs
-        if layers == 50:
-            self.res = ResNet50Layers()
-        elif layers == 101:
-            self.res = ResNet101Layers()
-        elif layers == 152:
-            self.res = ResNet152Layers()
+
         with self.init_scope():
+            self.res = res()
             self.head1 = L.Convolution2D(2048, 512, 1)
             self.head2 = L.Convolution2D(512, 512, 3, 1, 1)
             self.head3 = L.Convolution2D(512, 512, 3, 1, 1)
@@ -56,19 +52,19 @@ class ResNet(chainer.Chain):
 class ResNet50(ResNet):
 
     def __init__(self, joints=19, limbs=38):
-        super(ResNet50, self).__init__(joints, limbs, layers=50)
+        super(ResNet50, self).__init__(joints, limbs, res=ResNet50Layers)
 
 
 class ResNet101(ResNet):
 
     def __init__(self, joints=19, limbs=38):
-        super(ResNet101, self).__init__(joints, limbs, layers=101)
+        super(ResNet101, self).__init__(joints, limbs, res=ResNet101Layers)
 
 
 class ResNet152(ResNet):
 
     def __init__(self, joints=19, limbs=38):
-        super(ResNet152, self).__init__(joints, limbs, layers=152)
+        super(ResNet152, self).__init__(joints, limbs, res=ResNet152Layers)
 
 
 if __name__ == '__main__':
@@ -78,6 +74,6 @@ if __name__ == '__main__':
     import time
     import numpy as np
 
-    model = ResNet50()
+    model = ResNet101()
     arr = np.random.randn(1, 3, model.insize, model.insize).astype('f')
     h1s, h2s = model(arr)
