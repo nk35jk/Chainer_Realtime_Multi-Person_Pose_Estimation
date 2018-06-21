@@ -86,7 +86,7 @@ class CocoDataLoader(object):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--vis', action='store_true', help='visualize annotations and ignore masks')
+    parser.add_argument('--dry_run', action='store_true', help='visualize annotations and ignore masks')
     args = parser.parse_args()
 
     for mode in ['train', 'val']:
@@ -101,7 +101,7 @@ if __name__ == '__main__':
             img, annotations, img_id = data_loader.get_img_annotation(ind=i)
             mask_all, mask_miss = data_loader.gen_masks(img, annotations)
 
-            if args.vis:
+            if args.dry_run:
                 ann_img = data_loader.draw_masks_and_keypoints(img, annotations)
                 msk_img = data_loader.dwaw_gen_masks(img, mask_miss)
                 cv2.imshow('image', np.hstack((ann_img, msk_img)))
@@ -109,9 +109,9 @@ if __name__ == '__main__':
                 if k == ord('q'):
                     break
                 elif k == ord('s'):
-                    cv2.imwrite('aaa.png', np.hstack((ann_img, msk_img)))
+                    cv2.imwrite('ignore_mask.png', np.hstack((ann_img, msk_img)))
 
-            if np.any(mask_miss) and not args.vis:
+            if np.any(mask_miss) and not args.dry_run:
                 mask_miss = mask_miss.astype(np.uint8) * 255
                 save_path = os.path.join(save_dir, '{:012d}.png'.format(img_id))
                 cv2.imwrite(save_path, mask_miss)
