@@ -175,7 +175,6 @@ class Updater(StandardUpdater):
         pafs_ys, heatmaps_ys = optimizer.target(x_data)
 
         pafs_teacher = heatmaps_teacher = 0
-
         if self.teacher:
             if args.teacher_type == 'single':
                 # single scale prediction
