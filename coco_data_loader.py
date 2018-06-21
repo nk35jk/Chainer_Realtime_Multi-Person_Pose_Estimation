@@ -252,7 +252,7 @@ class CocoDataLoader(DatasetMixin):
 
         return aug_img, ignore_mask, poses
 
-    def generate_heatmap(self, shape, joint, sigma):
+    def gen_heatmap(self, shape, joint, sigma):
         """return shape: (height, width)"""
         x, y, v = joint
         if v == 0:
@@ -263,14 +263,14 @@ class CocoDataLoader(DatasetMixin):
         gaussian_heatmap = np.exp(-0.5 * grid_distance / sigma**2)
         return gaussian_heatmap
 
-    def generate_heatmaps(self, img, poses, heatmap_sigma):
+    def gen_heatmaps(self, img, poses, heatmap_sigma):
         heatmaps = np.zeros((0,) + img.shape[:-1])
         heatmap_max = np.zeros(img.shape[:-1])
         for joint_index in range(len(JointType)):
             heatmap = np.zeros(img.shape[:-1])
             for pose in poses:
                 if pose[joint_index, 2] > 0:
-                    jointmap = self.generate_heatmap(img.shape[:-1], pose[joint_index], heatmap_sigma)
+                    jointmap = self.gen_heatmap(img.shape[:-1], pose[joint_index], heatmap_sigma)
                     heatmap[jointmap > heatmap] = jointmap[jointmap > heatmap]
                     heatmap_max[jointmap > heatmap_max] = jointmap[jointmap > heatmap_max]
             heatmaps = np.vstack((heatmaps, heatmap.reshape((1,) + heatmap.shape)))
@@ -278,20 +278,20 @@ class CocoDataLoader(DatasetMixin):
         heatmaps = np.vstack((heatmaps, bg_heatmap[None]))
         return heatmaps.astype('f')
 
-    def generate_heatmaps2(self, img, poses, heatmap_sigma):
+    def gen_heatmaps2(self, img, poses, heatmap_sigma):
         heatmaps = np.zeros((len(JointType),) + img.shape[:-1])
 
         if len(poses) > 0:
             jointmaps = []
             for pose in poses:
-                jointmaps.append(np.stack([self.generate_heatmap(img.shape[:-1], pose[i], heatmap_sigma) for i in range(len(JointType))]))
+                jointmaps.append(np.stack([self.gen_heatmap(img.shape[:-1], pose[i], heatmap_sigma) for i in range(len(JointType))]))
             heatmaps = np.array(jointmaps).max(axis=0)
 
         bg_heatmap = 1 - heatmaps.max(axis=0) # background channel
         heatmaps = np.vstack((heatmaps, bg_heatmap[None]))
         return heatmaps.astype('f')
 
-    def generate_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
+    def gen_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
         """return shape: (2, height, width)"""
         if np.array_equal(joint_from, joint_to): # same joint
             return np.zeros((2,) + shape)
@@ -311,7 +311,7 @@ class CocoDataLoader(DatasetMixin):
         constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape + (2,)).transpose(2, 0, 1)
         return constant_paf
 
-    def generate_round_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
+    def gen_round_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
         """return shape: (2, height, width)"""
         v_from = joint_from[-1]
         v_to = joint_to[-1]
@@ -338,7 +338,7 @@ class CocoDataLoader(DatasetMixin):
         constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape + (2,)).transpose(2, 0, 1) # 220
         return constant_paf
 
-    def generate_pafs(self, img, poses, paf_sigma):
+    def gen_pafs(self, img, poses, paf_sigma):
         pafs = np.zeros((0,) + img.shape[:-1])
 
         for limb in params['limbs_point']:
@@ -348,7 +348,7 @@ class CocoDataLoader(DatasetMixin):
             for pose in poses:
                 joint_from, joint_to = pose[limb]
                 if joint_from[2] > 0 and joint_to[2] > 0:
-                    limb_paf = self.generate_round_constant_paf(img.shape[:-1], joint_from, joint_to, paf_sigma)
+                    limb_paf = self.gen_round_constant_paf(img.shape[:-1], joint_from, joint_to, paf_sigma)
                     limb_paf_flags = limb_paf != 0
                     paf_flags += np.broadcast_to(limb_paf_flags[0] | limb_paf_flags[1], limb_paf.shape)
                     paf += limb_paf
@@ -357,7 +357,7 @@ class CocoDataLoader(DatasetMixin):
             pafs = np.vstack((pafs, paf))
         return pafs.astype('f')
 
-    def generate_pafs2(self, img, poses, paf_sigma):
+    def gen_pafs2(self, img, poses, paf_sigma):
         pafs = np.zeros((len(params['limbs_point'])*2,) + img.shape[:-1])
         pafs_flag = np.zeros((len(params['limbs_point'])*2,) + img.shape[:-1]).astype('i')
         for pose in poses:
@@ -367,7 +367,7 @@ class CocoDataLoader(DatasetMixin):
                 joint_froms.append(joint_pair[0])
                 joint_tos.append(joint_pair[1])
 
-            tmp_pafs = np.concatenate([self.generate_round_constant_paf(img.shape[:-1],from_, to, paf_sigma)
+            tmp_pafs = np.concatenate([self.gen_round_constant_paf(img.shape[:-1],from_, to, paf_sigma)
                                        for from_, to in zip(joint_froms, joint_tos)])
             pafs += tmp_pafs
             pafs_flag += tmp_pafs != 0
@@ -438,14 +438,14 @@ class CocoDataLoader(DatasetMixin):
         gt_pose = np.array(ann['keypoints']).reshape(-1, 3)
         return poses
 
-    def generate_labels(self, img, poses, ignore_mask):
+    def gen_labels(self, img, poses, ignore_mask):
         img, ignore_mask, poses = self.augment_data(img, ignore_mask, poses)
         resized_img, ignore_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape=(self.insize, self.insize))
 
         # TODO: 人物のスケールを求める
         scale = 1
-        heatmaps = self.generate_heatmaps2(resized_img, resized_poses, params['heatmap_sigma']*scale)
-        pafs = self.generate_pafs2(resized_img, resized_poses, params['paf_sigma']*scale)
+        heatmaps = self.gen_heatmaps2(resized_img, resized_poses, params['heatmap_sigma']*scale)
+        pafs = self.gen_pafs2(resized_img, resized_poses, params['paf_sigma']*scale)
         ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
         return resized_img, pafs, heatmaps, ignore_mask
 
@@ -466,7 +466,7 @@ class CocoDataLoader(DatasetMixin):
         self.img_id = img_id
 
         poses = self.parse_coco_annotation(annotations)
-        resized_img, pafs, heatmaps, ignore_mask = self.generate_labels(img, poses, ignore_mask)
+        resized_img, pafs, heatmaps, ignore_mask = self.gen_labels(img, poses, ignore_mask)
         return resized_img, pafs, heatmaps, ignore_mask
 
 
@@ -489,7 +489,7 @@ if __name__ == '__main__':
         # if len(annotations) > 0:
         if True:
             poses = data_loader.parse_coco_annotation(annotations)
-            resized_img, pafs, heatmaps, ignore_mask = data_loader.generate_labels(img, poses, ignore_mask)
+            resized_img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, poses, ignore_mask)
 
             # resize to view
             shape = (params['insize'],) * 2
