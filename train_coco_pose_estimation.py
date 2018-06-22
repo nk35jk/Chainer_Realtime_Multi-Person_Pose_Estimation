@@ -526,8 +526,6 @@ if __name__ == '__main__':
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
         'main/heat', 'val/heat' #'AP', 'AR'
     ]), trigger=log_interval)
-    trainer.extend(extensions.PlotReport(
-        ['main/loss', 'val/loss'], x_key='iteration', file_name='loss.png'))
 
     if not args.test:
         trainer.extend(extensions.snapshot(), trigger=(args.save_iter, 'iteration'))
