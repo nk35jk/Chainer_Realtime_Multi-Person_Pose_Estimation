@@ -80,6 +80,8 @@ params = {
     'downscale': 8,
     'paf_sigma': 8,
     'heatmap_sigma': 7,
+    'area_basis': 5000,
+    'max_ratio': 2,
 
     'min_box_size': 64,
     'max_box_size': 512,
