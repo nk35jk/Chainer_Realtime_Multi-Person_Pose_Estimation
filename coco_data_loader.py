@@ -443,10 +443,14 @@ class CocoDataLoader(DatasetMixin):
         resized_img, ignore_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape=(self.insize, self.insize))
 
         # TODO: 人物のスケールを求める
-        scale = 1
-        heatmaps = self.gen_heatmaps2(resized_img, resized_poses, params['heatmap_sigma']*scale)
-        pafs = self.gen_pafs2(resized_img, resized_poses, params['paf_sigma']*scale)
-        ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
+        # scale = 1
+        # heatmaps = self.gen_heatmaps(resized_img, resized_poses, params['heatmap_sigma']*scale)
+        # pafs = self.gen_pafs(resized_img, resized_poses, params['paf_sigma']*scale)
+        # ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
+
+        heatmaps = np.random.rand(19, 368, 368)
+        pafs = np.random.rand(38, 368, 368)
+        ignore_mask = np.zeros((368, 368), 'bool')
         return resized_img, pafs, heatmaps, ignore_mask
 
     def get_example(self, i, img_id=None):
