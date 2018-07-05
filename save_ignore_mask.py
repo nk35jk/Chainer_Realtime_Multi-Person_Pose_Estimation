@@ -107,7 +107,7 @@ if __name__ == '__main__':
                 cv2.imshow('image', np.hstack((ann_img, msk_img)))
                 k = cv2.waitKey()
                 if k == ord('q'):
-                    break
+                    exit()
                 elif k == ord('s'):
                     cv2.imwrite('ignore_mask.png', np.hstack((ann_img, msk_img)))
 
