@@ -25,6 +25,8 @@ class PoseDetector(object):
             print('Loading the model...')
             if arch == 'posenet':
                 self.model = params['archs'][arch](stages=stages)
+            elif arch in ['resnet50-dilate', 'resnet101-dilate', 'resnet152-dilate']:
+                self.model = params['archs'][arch](dilate=True)
             else:
                 self.model = params['archs'][arch]()
 
