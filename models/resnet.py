@@ -9,39 +9,21 @@ class ResNet(chainer.Chain):
     insize = 368
     downscale = pad = 8
 
-    def __init__(self, joints=19, limbs=38, res=ResNet50Layers):
+    def __init__(self, joints=19, limbs=38, res=ResNet50Layers, dilate=False):
         super(ResNet, self).__init__()
         self.joints = joints
         self.limbs = limbs
 
         with self.init_scope():
-            self.res = res()
-            self.head1 = L.Convolution2D(2048, 512, 1)
-            self.head2 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head3 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head4 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head5 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head6 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head7 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head8 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head9 = L.Convolution2D(512, 512, 3, 1, 1)
-            self.head10 = L.Convolution2D(512, limbs+joints, 1)
+            self.res = res(dilate=dilate)
+            self.head = L.Convolution2D(2048, limbs+joints, 1)
 
     def __call__(self, x):
         heatmaps = []
         pafs = []
 
         h = self.res(x, ['res5'])['res5']
-        h = self.head1(h)
-        h = self.head2(h)
-        h = self.head3(h)
-        h = self.head4(h)
-        h = self.head5(h)
-        h = self.head6(h)
-        h = self.head7(h)
-        h = self.head8(h)
-        h = self.head9(h)
-        h = self.head10(h)
+        h = self.head(h)
 
         pafs = [h[:, :self.limbs]]
         heatmaps = [h[:, -self.joints:]]
@@ -51,20 +33,23 @@ class ResNet(chainer.Chain):
 
 class ResNet50(ResNet):
 
-    def __init__(self, joints=19, limbs=38):
-        super(ResNet50, self).__init__(joints, limbs, res=ResNet50Layers)
+    def __init__(self, joints=19, limbs=38, dilate=False):
+        super(ResNet50, self).__init__(joints, limbs, res=ResNet50Layers,
+                                        dilate=dilate)
 
 
 class ResNet101(ResNet):
 
-    def __init__(self, joints=19, limbs=38):
-        super(ResNet101, self).__init__(joints, limbs, res=ResNet101Layers)
+    def __init__(self, joints=19, limbs=38, dilate=False):
+        super(ResNet101, self).__init__(joints, limbs, res=ResNet101Layers,
+                                        dilate=dilate)
 
 
 class ResNet152(ResNet):
 
-    def __init__(self, joints=19, limbs=38):
-        super(ResNet152, self).__init__(joints, limbs, res=ResNet152Layers)
+    def __init__(self, joints=19, limbs=38, dilate=False):
+        super(ResNet152, self).__init__(joints, limbs, res=ResNet152Layers,
+                                        dilate=dilate)
 
 
 if __name__ == '__main__':

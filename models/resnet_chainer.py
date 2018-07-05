@@ -78,7 +78,7 @@ class ResNetLayers(link.Chain):
             layer names used by ``__call__`` and ``extract`` methods.
     """
 
-    def __init__(self, pretrained_model, n_layers, downsample_fb=False):
+    def __init__(self, pretrained_model, n_layers, downsample_fb=False, dilate=False): # change
         super(ResNetLayers, self).__init__()
 
         if pretrained_model:
@@ -102,13 +102,15 @@ class ResNetLayers(link.Chain):
             raise ValueError('The n_layers argument should be either 50, 101,'
                              ' or 152, but {} was given.'.format(n_layers))
 
+        dilate = [1, 1, 2, 4] if dilate else [1, 1, 1, 1]
+
         with self.init_scope():
             self.conv1 = Convolution2D(3, 64, 7, 2, 3, **conv_kwargs)
             self.bn1 = BatchNormalization(64)
-            self.res2 = BuildingBlock(block[0], 64, 64, 256, 1, **kwargs)
-            self.res3 = BuildingBlock(block[1], 256, 128, 512, 2, **kwargs)
-            self.res4 = BuildingBlock(block[2], 512, 256, 1024, 1, **kwargs)
-            self.res5 = BuildingBlock(block[3], 1024, 512, 2048, 1, **kwargs)
+            self.res2 = BuildingBlock(block[0], 64, 64, 256, 1, dilate[0], **kwargs) # change
+            self.res3 = BuildingBlock(block[1], 256, 128, 512, 2, dilate[1], **kwargs) # change
+            self.res4 = BuildingBlock(block[2], 512, 256, 1024, 1, dilate[2], **kwargs) # change
+            self.res5 = BuildingBlock(block[3], 1024, 512, 2048, 1, dilate[3], **kwargs) # change
             self.fc6 = Linear(2048, 1000)
 
         if pretrained_model and pretrained_model.endswith('.caffemodel'):
@@ -340,11 +342,11 @@ class ResNet50Layers(ResNetLayers):
             layer names used by ``__call__`` and ``extract`` methods.
     """
 
-    def __init__(self, pretrained_model='auto', downsample_fb=False):
+    def __init__(self, pretrained_model='auto', downsample_fb=False, dilate=False): # change
         if pretrained_model == 'auto':
             pretrained_model = 'ResNet-50-model.caffemodel'
         super(ResNet50Layers, self).__init__(
-            pretrained_model, 50, downsample_fb)
+            pretrained_model, 50, downsample_fb, dilate) # change
 
 
 class ResNet101Layers(ResNetLayers):
@@ -393,11 +395,11 @@ class ResNet101Layers(ResNetLayers):
             layer names used by ``__call__`` and ``extract`` methods.
     """
 
-    def __init__(self, pretrained_model='auto', downsample_fb=False):
+    def __init__(self, pretrained_model='auto', downsample_fb=False, dilate=False): # change
         if pretrained_model == 'auto':
             pretrained_model = 'ResNet-101-model.caffemodel'
         super(ResNet101Layers, self).__init__(
-            pretrained_model, 101, downsample_fb)
+            pretrained_model, 101, downsample_fb, dilate) # change
 
 
 class ResNet152Layers(ResNetLayers):
@@ -445,11 +447,11 @@ class ResNet152Layers(ResNetLayers):
             layer names used by ``__call__`` and ``extract`` methods.
     """
 
-    def __init__(self, pretrained_model='auto', downsample_fb=False):
+    def __init__(self, pretrained_model='auto', downsample_fb=False, dilate=False): # change
         if pretrained_model == 'auto':
             pretrained_model = 'ResNet-152-model.caffemodel'
         super(ResNet152Layers, self).__init__(
-            pretrained_model, 152, downsample_fb)
+            pretrained_model, 152, downsample_fb, dilate) # change
 
 
 def prepare(image, size=(224, 224)):
@@ -516,16 +518,16 @@ class BuildingBlock(link.Chain):
     """
 
     def __init__(self, n_layer, in_channels, mid_channels,
-                 out_channels, stride, initialW=None, downsample_fb=False):
+                 out_channels, stride, dilate, initialW=None, downsample_fb=False): # change
         super(BuildingBlock, self).__init__()
         with self.init_scope():
             self.a = BottleneckA(
-                in_channels, mid_channels, out_channels, stride,
+                in_channels, mid_channels, out_channels, stride, dilate, # change
                 initialW, downsample_fb)
             self._forward = ["a"]
             for i in range(n_layer - 1):
                 name = 'b{}'.format(i + 1)
-                bottleneck = BottleneckB(out_channels, mid_channels, initialW)
+                bottleneck = BottleneckB(out_channels, mid_channels, dilate, initialW) # change
                 setattr(self, name, bottleneck)
                 self._forward.append(name)
 
@@ -559,7 +561,7 @@ class BottleneckA(link.Chain):
     """
 
     def __init__(self, in_channels, mid_channels, out_channels,
-                 stride=2, initialW=None, downsample_fb=False):
+                 stride=2, dilate=1, initialW=None, downsample_fb=False): # change
         super(BottleneckA, self).__init__()
         # In the original MSRA ResNet, stride=2 is on 1x1 convolution.
         # In Facebook ResNet, stride=2 is on 3x3 convolution.
@@ -571,8 +573,8 @@ class BottleneckA(link.Chain):
                 nobias=True)
             self.bn1 = BatchNormalization(mid_channels)
             self.conv2 = Convolution2D(
-                mid_channels, mid_channels, 3, stride_3x3, 1,
-                initialW=initialW, nobias=True)
+                mid_channels, mid_channels, 3, stride_3x3, dilate,
+                initialW=initialW, nobias=True, dilate=dilate) # change
             self.bn2 = BatchNormalization(mid_channels)
             self.conv3 = Convolution2D(
                 mid_channels, out_channels, 1, 1, 0, initialW=initialW,
@@ -601,7 +603,7 @@ class BottleneckB(link.Chain):
             the convolutional layers.
     """
 
-    def __init__(self, in_channels, mid_channels, initialW=None):
+    def __init__(self, in_channels, mid_channels, dilate, initialW=None): # change
         super(BottleneckB, self).__init__()
         with self.init_scope():
             self.conv1 = Convolution2D(
@@ -609,8 +611,8 @@ class BottleneckB(link.Chain):
                 nobias=True)
             self.bn1 = BatchNormalization(mid_channels)
             self.conv2 = Convolution2D(
-                mid_channels, mid_channels, 3, 1, 1, initialW=initialW,
-                nobias=True)
+                mid_channels, mid_channels, 3, 1, dilate, initialW=initialW,
+                nobias=True, dilate=dilate) # change
             self.bn2 = BatchNormalization(mid_channels)
             self.conv3 = Convolution2D(
                 mid_channels, in_channels, 1, 1, 0, initialW=initialW,

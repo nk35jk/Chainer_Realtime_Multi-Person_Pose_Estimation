@@ -136,7 +136,7 @@ def preprocess(imgs):
     if args.arch in ['posenet', 'student']:
         x_data /= 255
         x_data -= 0.5
-    elif args.arch in ['nn1', 'resnetfpn', 'psp', 'cpn', 'mobilenet', 'resnet50', 'resnet101', 'resnet152']:
+    else:
         x_data -= xp.array([104, 117, 123])
     x_data = x_data.transpose(0, 3, 1, 2)
     return x_data
@@ -159,7 +159,9 @@ class Updater(StandardUpdater):
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch in ['resnetfpn', 'pspnet', 'cpn', 'resnet50', 'resnet101', 'resnet152']:
+            elif args.arch in ['resnetfpn', 'pspnet', 'cpn',
+                               'resnet50', 'resnet101', 'resnet152',
+                               'resnet50-dilate', 'resnet101-dilate', 'resnet152-dilate']:
                 optimizer.target.res.enable_update()
             elif args.arch in ['nn1']:
                 optimizer.target.squeeze.enable_update()
@@ -417,6 +419,8 @@ if __name__ == '__main__':
     # Prepare model
     if args.arch == 'posenet':
         model = params['archs'][args.arch](stages=args.stages)
+    elif args.arch in ['resnet50-dilate', 'resnet101-dilate', 'resnet152-dilate']:
+        model = params['archs'][args.arch](dilate=True)
     else:
         model = params['archs'][args.arch]()
 
@@ -472,7 +476,8 @@ if __name__ == '__main__':
             model.res.disable_update()
         elif args.arch in ['nn1']:
             model.squeeze.disable_update()
-        if args.arch in ['resnet50', 'resnet101', 'resnet152']:
+        if args.arch in ['resnet50', 'resnet101', 'resnet152',
+                         'resnet50-dilate', 'resnet101-dilate', 'resnet152-dilate']:
             model.res.disable_update()
 
     # Load datasets
