@@ -141,7 +141,7 @@ class CocoDataLoader(DatasetMixin):
                                     borderMode=cv2.BORDER_CONSTANT, borderValue=(104, 117, 123))
         rotate_mask = cv2.warpAffine(mask.astype('uint8')*255, R, (int(bbox[0]+0.5), int(bbox[1]+0.5))) > 0
         if label is not None:
-            label = cv2.warpAffine(label.transpose(1, 2, 0), R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_LINEAR, 
+            label = cv2.warpAffine(label.transpose(1, 2, 0), R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_LINEAR,
                                    borderMode=cv2.BORDER_CONSTANT, borderValue=0).transpose(2, 0, 1) # last channel
 
         tmp_poses = np.ones_like(poses)
@@ -184,8 +184,11 @@ class CocoDataLoader(DatasetMixin):
 
             crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
             crop_mask[y_from:y_to+1, x_from:x_to+1] = ignore_mask[y1:y2+1, x1:x2+1].copy()
+
             if label is not None:
-                label = label[:, y_from:y_to+1, x_from:x_to+1] = ignore_mask[y1:y2+1, x1:x2+1]
+                crop_label = np.zeros((57, self.insize, self.insize), 'float32')
+                crop_label[:, y_from:y_to+1, x_from:x_to+1] = label[:, y1:y2+1, x1:x2+1].copy()
+                label = crop_label
 
             poses[:, :, :2] -= offset
         else:
@@ -197,7 +200,8 @@ class CocoDataLoader(DatasetMixin):
                 x1 = random.randint(0, w - self.insize)
                 crop_img = img[y1:y1+self.insize, x1:x1+self.insize].copy()
                 if label is not None:
-                    import ipdb; ipdb.set_trace()
+                    crop_label = label[:, y1:y1+self.insize, x1:x1+self.insize].copy()
+                    label = crop_label
             else:
                 center = np.array([w/2, h/2]).astype('i')
 
@@ -218,8 +222,11 @@ class CocoDataLoader(DatasetMixin):
                 y_to = self.insize - offset_[1] - 1 if offset_[1] >= 0 else self.insize - 1
 
                 crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
+
                 if label is not None:
-                    import ipdb; ipdb.set_trace()
+                    crop_label = np.zeros((57, self.insize, self.insize), 'float32')
+                    crop_label[:, y_from:y_to+1, x_from:x_to+1] = label[:, y1:y2+1, x1:x2+1].copy()
+                    label = crop_label
 
         return crop_img.astype('uint8'), crop_mask, poses, label
 
@@ -255,8 +262,24 @@ class CocoDataLoader(DatasetMixin):
         swap_joints(poses, JointType.LeftKnee, JointType.RightKnee)
         swap_joints(poses, JointType.LeftFoot, JointType.RightFoot)
 
-        if label is not None:
+        def swap_labels(label, joint_type_1, joint_type_2):
+            pafs, heatmaps = np.split(label, [38])
+
             import ipdb; ipdb.set_trace()
+
+            tmp = heatmaps[joint_type_1].copy()
+            heatmaps[joint_type_1] = heatmaps[joint_type_2]
+            heatmaps[joint_type_2] = tmp
+
+        if label is not None:
+            swap_labels(label, JointType.LeftEye, JointType.RightEye)
+            swap_labels(label, JointType.LeftEar, JointType.RightEar)
+            swap_labels(label, JointType.LeftShoulder, JointType.RightShoulder)
+            swap_labels(label, JointType.LeftElbow, JointType.RightElbow)
+            swap_labels(label, JointType.LeftHand, JointType.RightHand)
+            swap_labels(label, JointType.LeftWaist, JointType.RightWaist)
+            swap_labels(label, JointType.LeftKnee, JointType.RightKnee)
+            swap_labels(label, JointType.LeftFoot, JointType.RightFoot)
         return flipped_img, flipped_mask, poses, label
 
     def augment_data(self, img, ignore_mask, poses, label=None):
