@@ -293,6 +293,7 @@ class CocoDataLoader(DatasetMixin):
             swap_pafs(label, 9, 13)
             swap_pafs(label, 15, 16)
             swap_pafs(label, 17, 18)
+
         return flipped_img, flipped_mask, poses, label
 
     def augment_data(self, img, ignore_mask, poses, label=None):
@@ -473,12 +474,6 @@ class CocoDataLoader(DatasetMixin):
                 if ann['category_id'] == 1 and ann['num_keypoints'] >= params['min_keypoints'] and ann['area'] > params['min_area']:
                     person_cnt += 1
                     valid_annotations.append(ann)
-
-                # print('---')
-                # print(ann['bbox'])
-                # print(ann['num_keypoints'])
-                # print(ann['area'])
-                # print('---')
 
         if self.mode == 'train':
             img_path = os.path.join(self.coco_dir, 'train2017', '{:012d}.jpg'.format(img_id))
