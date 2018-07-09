@@ -480,7 +480,7 @@ class PoseDetector(object):
             x_data /= 255
             x_data -= 0.5
         else:
-            x_data -= xp.array([104, 117, 123])
+            x_data -= np.array([104, 117, 123])
         x_data = x_data.transpose(2, 0, 1)[None]
         return x_data
 
