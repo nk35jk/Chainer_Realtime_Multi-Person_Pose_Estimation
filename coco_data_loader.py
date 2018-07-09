@@ -95,8 +95,7 @@ class CocoDataLoader(DatasetMixin):
         poses[:, :, :2] = (poses[:, :, :2] * np.array(shape) / np.array((img_w, img_h)))
 
         if label is not None:
-            import ipdb; ipdb.set_trace()
-
+            label = cv2.resize(label.transpose(1, 2, 0), shape).transpose(2, 0, 1)
         return resized_img, ignore_mask, poses, label
 
     def random_resize_img(self, img, ignore_mask, poses, label=None):
@@ -123,7 +122,7 @@ class CocoDataLoader(DatasetMixin):
 
         shape = (round(w * scale), round(h * scale))
 
-        resized_img, resized_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape, label)
+        resized_img, resized_mask, resized_poses, label = self.resize_data(img, ignore_mask, poses, shape, label)
         return resized_img, resized_mask, poses, label
 
     def random_rotate_img(self, img, mask, poses, label=None):
@@ -142,7 +141,8 @@ class CocoDataLoader(DatasetMixin):
                                     borderMode=cv2.BORDER_CONSTANT, borderValue=(104, 117, 123))
         rotate_mask = cv2.warpAffine(mask.astype('uint8')*255, R, (int(bbox[0]+0.5), int(bbox[1]+0.5))) > 0
         if label is not None:
-            import ipdb; ipdb.set_trace()
+            label = cv2.warpAffine(label.transpose(1, 2, 0), R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_LINEAR, 
+                                   borderMode=cv2.BORDER_CONSTANT, borderValue=0).transpose(2, 0, 1) # last channel
 
         tmp_poses = np.ones_like(poses)
         tmp_poses[:, :, :2] = poses[:, :, :2].copy()
@@ -185,7 +185,7 @@ class CocoDataLoader(DatasetMixin):
             crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
             crop_mask[y_from:y_to+1, x_from:x_to+1] = ignore_mask[y1:y2+1, x1:x2+1].copy()
             if label is not None:
-                import ipdb; ipdb.set_trace()
+                label = label[:, y_from:y_to+1, x_from:x_to+1] = ignore_mask[y1:y2+1, x1:x2+1]
 
             poses[:, :, :2] -= offset
         else:
@@ -261,13 +261,13 @@ class CocoDataLoader(DatasetMixin):
 
     def augment_data(self, img, ignore_mask, poses, label=None):
         aug_img = img.copy()
-        aug_img, ignore_mask, poses = self.random_resize_img(aug_img, ignore_mask, poses, label)
-        aug_img, ignore_mask, poses = self.random_rotate_img(aug_img, ignore_mask, poses, label)
-        aug_img, ignore_mask, poses = self.random_crop_img(aug_img, ignore_mask, poses, label)
+        aug_img, ignore_mask, poses, label = self.random_resize_img(aug_img, ignore_mask, poses, label)
+        aug_img, ignore_mask, poses, label = self.random_rotate_img(aug_img, ignore_mask, poses, label)
+        aug_img, ignore_mask, poses, label = self.random_crop_img(aug_img, ignore_mask, poses, label)
         if np.random.randint(2):
-            aug_img = self.distort_color(aug_img, label)
+            aug_img = self.distort_color(aug_img)
         if np.random.randint(2):
-            aug_img, ignore_mask, poses = self.flip_img(aug_img, ignore_mask, poses, label)
+            aug_img, ignore_mask, poses, label = self.flip_img(aug_img, ignore_mask, poses, label)
 
         return aug_img, ignore_mask, poses, label
 
