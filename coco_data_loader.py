@@ -262,24 +262,38 @@ class CocoDataLoader(DatasetMixin):
         swap_joints(poses, JointType.LeftKnee, JointType.RightKnee)
         swap_joints(poses, JointType.LeftFoot, JointType.RightFoot)
 
-        def swap_labels(label, joint_type_1, joint_type_2):
-            pafs, heatmaps = np.split(label, [38])
+        def swap_heatmaps(label, joint_type_1, joint_type_2):
+            joint_type_1 += 38
+            joint_type_2 += 38
 
+            tmp = label[joint_type_1].copy()
+            label[joint_type_1] = label[joint_type_2]
+            label[joint_type_2] = tmp
+
+        def swap_pafs(label, limb1, limb2):
             import ipdb; ipdb.set_trace()
-
-            tmp = heatmaps[joint_type_1].copy()
-            heatmaps[joint_type_1] = heatmaps[joint_type_2]
-            heatmaps[joint_type_2] = tmp
+            tmp = label[limb1*2:limb1*2+2].copy()
+            label[limb1*2:limb1*2+2] = label[limb2*2:limb2*2+2]
+            label[limb2*2:limb2*2+2] = tmp
 
         if label is not None:
-            swap_labels(label, JointType.LeftEye, JointType.RightEye)
-            swap_labels(label, JointType.LeftEar, JointType.RightEar)
-            swap_labels(label, JointType.LeftShoulder, JointType.RightShoulder)
-            swap_labels(label, JointType.LeftElbow, JointType.RightElbow)
-            swap_labels(label, JointType.LeftHand, JointType.RightHand)
-            swap_labels(label, JointType.LeftWaist, JointType.RightWaist)
-            swap_labels(label, JointType.LeftKnee, JointType.RightKnee)
-            swap_labels(label, JointType.LeftFoot, JointType.RightFoot)
+            swap_heatmaps(label, JointType.LeftEye, JointType.RightEye)
+            swap_heatmaps(label, JointType.LeftEar, JointType.RightEar)
+            swap_heatmaps(label, JointType.LeftShoulder, JointType.RightShoulder)
+            swap_heatmaps(label, JointType.LeftElbow, JointType.RightElbow)
+            swap_heatmaps(label, JointType.LeftHand, JointType.RightHand)
+            swap_heatmaps(label, JointType.LeftWaist, JointType.RightWaist)
+            swap_heatmaps(label, JointType.LeftKnee, JointType.RightKnee)
+            swap_heatmaps(label, JointType.LeftFoot, JointType.RightFoot)
+            swap_pafs(label, 0, 3)
+            swap_pafs(label, 1, 4)
+            swap_pafs(label, 2, 5)
+            swap_pafs(label, 6, 10)
+            swap_pafs(label, 7, 11)
+            swap_pafs(label, 8, 12)
+            swap_pafs(label, 9, 13)
+            swap_pafs(label, 15, 16)
+            swap_pafs(label, 17, 18)
         return flipped_img, flipped_mask, poses, label
 
     def augment_data(self, img, ignore_mask, poses, label=None):
