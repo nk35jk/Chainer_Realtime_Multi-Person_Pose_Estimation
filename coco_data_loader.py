@@ -447,13 +447,13 @@ class CocoDataLoader(DatasetMixin):
                 # print('---')
 
         if self.mode == 'train':
-            img_path = os.path.join(self.coco_dir, 'train2017', '{:012d}.png'.format(img_id))
+            img_path = os.path.join(self.coco_dir, 'train2017', '{:012d}.jpg'.format(img_id))
             mask_path = os.path.join(self.coco_dir, 'ignore_mask_train2017', '{:012d}.png'.format(img_id))
-            label_path = os.path.join(self.coco_dir, 'labels_train2017', '{:012d}.png'.format(img_id))
+            label_path = os.path.join(self.coco_dir, 'labels_train2017', '{:012d}.npy'.format(img_id))
         else:
-            img_path = os.path.join(self.coco_dir, 'val2017', '{:012d}.png'.format(img_id))
+            img_path = os.path.join(self.coco_dir, 'val2017', '{:012d}.jpg'.format(img_id))
             mask_path = os.path.join(self.coco_dir, 'ignore_mask_val2017', '{:012d}.png'.format(img_id))
-            label_path = os.path.join(self.coco_dir, 'labels_val2017', '{:012d}.png'.format(img_id))
+            label_path = os.path.join(self.coco_dir, 'labels_val2017', '{:012d}.npy'.format(img_id))
 
         img = cv2.imread(img_path)
         ignore_mask = cv2.imread(mask_path, 0)
