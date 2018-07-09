@@ -17,7 +17,7 @@ class CocoDataLoader(DatasetMixin):
 
     def __init__(self, coco_dir, coco, insize, mode='train', n_samples=None,
                  use_all_images=False, use_ignore_mask=True, augment_data=True,
-                 resize_data=True):
+                 resize_data=True, load_label=False):
         self.coco_dir = coco_dir
         self.coco = coco
         assert mode in ['train', 'val', 'eval'], 'Data loading mode is invalid.'
@@ -35,6 +35,7 @@ class CocoDataLoader(DatasetMixin):
         self.use_ignore_mask = bool(use_ignore_mask)
         self.augment_data_ = augment_data
         self.resize_data_ = resize_data
+        self.load_label = load_label
 
     def __len__(self):
         return len(self.imgIds)
@@ -85,16 +86,20 @@ class CocoDataLoader(DatasetMixin):
         pose_bboxes = np.array(pose_bboxes)
         return pose_bboxes
 
-    def resize_data(self, img, ignore_mask, poses, shape):
+    def resize_data(self, img, ignore_mask, poses, shape, label=None):
         """resize img, mask and annotations"""
         img_h, img_w, _ = img.shape
 
         resized_img = cv2.resize(img, shape)
         ignore_mask = cv2.resize(ignore_mask.astype(np.uint8), shape).astype('bool')
         poses[:, :, :2] = (poses[:, :, :2] * np.array(shape) / np.array((img_w, img_h)))
-        return resized_img, ignore_mask, poses
 
-    def random_resize_img(self, img, ignore_mask, poses):
+        if label:
+            import ipdb; ipdb.set_trace()
+
+        return resized_img, ignore_mask, poses, label
+
+    def random_resize_img(self, img, ignore_mask, poses, label=None):
         h, w, _ = img.shape
 
         if len(poses) > 0:
@@ -118,10 +123,10 @@ class CocoDataLoader(DatasetMixin):
 
         shape = (round(w * scale), round(h * scale))
 
-        resized_img, resized_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape)
-        return resized_img, resized_mask, poses
+        resized_img, resized_mask, resized_poses = self.resize_data(img, ignore_mask, poses, shape, label)
+        return resized_img, resized_mask, poses, label
 
-    def random_rotate_img(self, img, mask, poses):
+    def random_rotate_img(self, img, mask, poses, label=None):
         h, w, _ = img.shape
         # degree = (random.random() - 0.5) * 2 * params['max_rotate_degree']
         degree = np.random.randn() * 10
@@ -136,15 +141,17 @@ class CocoDataLoader(DatasetMixin):
         rotate_img = cv2.warpAffine(img, R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_CUBIC,
                                     borderMode=cv2.BORDER_CONSTANT, borderValue=(104, 117, 123))
         rotate_mask = cv2.warpAffine(mask.astype('uint8')*255, R, (int(bbox[0]+0.5), int(bbox[1]+0.5))) > 0
+        if label:
+            import ipdb; ipdb.set_trace()
 
         tmp_poses = np.ones_like(poses)
         tmp_poses[:, :, :2] = poses[:, :, :2].copy()
         tmp_rotate_poses = np.dot(tmp_poses, R.T)  # apply rotation matrix to the poses
         rotate_poses = poses.copy()  # to keep visibility flag
         rotate_poses[:, :, :2] = tmp_rotate_poses
-        return rotate_img, rotate_mask, rotate_poses
+        return rotate_img, rotate_mask, rotate_poses, label
 
-    def random_crop_img(self, img, ignore_mask, poses):
+    def random_crop_img(self, img, ignore_mask, poses, label=None):
         h, w, _ = img.shape
 
         if len(poses) > 0:
@@ -177,6 +184,8 @@ class CocoDataLoader(DatasetMixin):
 
             crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
             crop_mask[y_from:y_to+1, x_from:x_to+1] = ignore_mask[y1:y2+1, x1:x2+1].copy()
+            if label:
+                import ipdb; ipdb.set_trace()
 
             poses[:, :, :2] -= offset
         else:
@@ -187,6 +196,8 @@ class CocoDataLoader(DatasetMixin):
                 y1 = random.randint(0, h - self.insize)
                 x1 = random.randint(0, w - self.insize)
                 crop_img = img[y1:y1+self.insize, x1:x1+self.insize].copy()
+                if label:
+                    import ipdb; ipdb.set_trace()
             else:
                 center = np.array([w/2, h/2]).astype('i')
 
@@ -207,8 +218,10 @@ class CocoDataLoader(DatasetMixin):
                 y_to = self.insize - offset_[1] - 1 if offset_[1] >= 0 else self.insize - 1
 
                 crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
+                if label:
+                    import ipdb; ipdb.set_trace()
 
-        return crop_img.astype('uint8'), crop_mask, poses
+        return crop_img.astype('uint8'), crop_mask, poses, label
 
     def distort_color(self, img):
         img_max = np.broadcast_to(np.array(255, dtype=np.uint8), img.shape[:-1])
@@ -223,7 +236,7 @@ class CocoDataLoader(DatasetMixin):
         distorted_img = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2BGR)
         return distorted_img
 
-    def flip_img(self, img, mask, poses):
+    def flip_img(self, img, mask, poses, label=None):
         flipped_img = cv2.flip(img, 1)
         flipped_mask = cv2.flip(mask.astype(np.uint8), 1).astype('bool')
         poses[:, :, 0] = img.shape[1] - 1 - poses[:, :, 0]
@@ -241,19 +254,22 @@ class CocoDataLoader(DatasetMixin):
         swap_joints(poses, JointType.LeftWaist, JointType.RightWaist)
         swap_joints(poses, JointType.LeftKnee, JointType.RightKnee)
         swap_joints(poses, JointType.LeftFoot, JointType.RightFoot)
-        return flipped_img, flipped_mask, poses
 
-    def augment_data(self, img, ignore_mask, poses):
+        if label:
+            import ipdb; ipdb.set_trace()
+        return flipped_img, flipped_mask, poses, label
+
+    def augment_data(self, img, ignore_mask, poses, label=None):
         aug_img = img.copy()
-        aug_img, ignore_mask, poses = self.random_resize_img(aug_img, ignore_mask, poses)
-        aug_img, ignore_mask, poses = self.random_rotate_img(aug_img, ignore_mask, poses)
-        aug_img, ignore_mask, poses = self.random_crop_img(aug_img, ignore_mask, poses)
+        aug_img, ignore_mask, poses = self.random_resize_img(aug_img, ignore_mask, poses, label)
+        aug_img, ignore_mask, poses = self.random_rotate_img(aug_img, ignore_mask, poses, label)
+        aug_img, ignore_mask, poses = self.random_crop_img(aug_img, ignore_mask, poses, label)
         if np.random.randint(2):
-            aug_img = self.distort_color(aug_img)
+            aug_img = self.distort_color(aug_img, label)
         if np.random.randint(2):
-            aug_img, ignore_mask, poses = self.flip_img(aug_img, ignore_mask, poses)
+            aug_img, ignore_mask, poses = self.flip_img(aug_img, ignore_mask, poses, label)
 
-        return aug_img, ignore_mask, poses
+        return aug_img, ignore_mask, poses, label
 
     def gen_heatmap(self, shape, joint, sigma):
         """return shape: (height, width)"""
@@ -431,11 +447,13 @@ class CocoDataLoader(DatasetMixin):
                 # print('---')
 
         if self.mode == 'train':
-            img_path = os.path.join(self.coco_dir, 'train2017', self.coco.loadImgs([img_id])[0]['file_name'])
+            img_path = os.path.join(self.coco_dir, 'train2017', '{:012d}.png'.format(img_id))
             mask_path = os.path.join(self.coco_dir, 'ignore_mask_train2017', '{:012d}.png'.format(img_id))
+            label_path = os.path.join(self.coco_dir, 'labels_train2017', '{:012d}.png'.format(img_id))
         else:
-            img_path = os.path.join(self.coco_dir, 'val2017', self.coco.loadImgs([img_id])[0]['file_name'])
+            img_path = os.path.join(self.coco_dir, 'val2017', '{:012d}.png'.format(img_id))
             mask_path = os.path.join(self.coco_dir, 'ignore_mask_val2017', '{:012d}.png'.format(img_id))
+            label_path = os.path.join(self.coco_dir, 'labels_val2017', '{:012d}.png'.format(img_id))
 
         img = cv2.imread(img_path)
         ignore_mask = cv2.imread(mask_path, 0)
@@ -444,9 +462,13 @@ class CocoDataLoader(DatasetMixin):
         else:
             ignore_mask = ignore_mask == 255
 
+        label = None
+        if self.load_label and os.path.exists(label_path):
+            label = np.load(label_path)
+
         if self.mode == 'eval':
-            return img, img_id, annotations, ignore_mask
-        return img, img_id, valid_annotations, ignore_mask
+            return img, img_id, annotations, ignore_mask, label
+        return img, img_id, valid_annotations, ignore_mask, label
 
     def parse_coco_annotation(self, annotations):
         """coco annotation dataのアノテーションをposes配列に変換"""
@@ -474,33 +496,34 @@ class CocoDataLoader(DatasetMixin):
         gt_pose = np.array(ann['keypoints']).reshape(-1, 3)
         return poses
 
-    def gen_labels(self, img, ignore_mask, annotations):
+    def gen_labels(self, img, annotations, ignore_mask, label=None):
         poses = self.parse_coco_annotation(annotations)
         scales = np.array([i['area']/params['area_basis'] for i in annotations])**0.5
         scales = scales.clip(max=params['max_ratio'])
 
         if self.augment_data_:
-            img, ignore_mask, poses = self.augment_data(img, ignore_mask, poses)
+            img, ignore_mask, poses = self.augment_data(img, ignore_mask, poses, label)
         if self.resize_data_:
-            img, ignore_mask, poses = self.resize_data(img, ignore_mask, poses, shape=(self.insize, self.insize))
+            img, ignore_mask, poses = self.resize_data(img, ignore_mask, poses, (self.insize, self.insize), label)
 
-        heatmaps = self.gen_heatmaps(img, poses, scales, params['heatmap_sigma'])
-        pafs = self.gen_pafs(img, poses, scales, params['paf_sigma'])
-        ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
+        if not label:
+            heatmaps = self.gen_heatmaps(img, poses, scales, params['heatmap_sigma'])
+            pafs = self.gen_pafs(img, poses, scales, params['paf_sigma'])
+            ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
         return img, pafs, heatmaps, ignore_mask
 
     def get_example(self, i, img_id=None):
         self.img_id = img_id
 
         if img_id:
-            img, img_id, annotations, ignore_mask = self.get_img_annotation(img_id=img_id)
+            img, img_id, annotations, ignore_mask, label = self.get_img_annotation(img_id=img_id)
         else:
-            img, img_id, annotations, ignore_mask = self.get_img_annotation(ind=i)
+            img, img_id, annotations, ignore_mask, label = self.get_img_annotation(ind=i)
 
         if self.mode == 'eval':
             return img, annotations, img_id
 
-        resized_img, pafs, heatmaps, ignore_mask = self.gen_labels(img, ignore_mask, annotations)
+        resized_img, pafs, heatmaps, ignore_mask = self.gen_labels(img, annotations, ignore_mask, label)
         return resized_img, pafs, heatmaps, ignore_mask
 
 
@@ -509,7 +532,7 @@ if __name__ == '__main__':
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'],
                                  mode=mode, use_all_images=False, use_ignore_mask=True,
-                                 augment_data=True, resize_data=True)
+                                 augment_data=True, resize_data=True, load_label=True)
 
     # cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
@@ -517,14 +540,14 @@ if __name__ == '__main__':
     sum_heatmap_avg_norm = 0
 
     for i in range(len(data_loader)):
-        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
+        img, img_id, annotations, ignore_mask, label = data_loader.get_img_annotation(ind=i)
 
         print('img_id: {}'.format(img_id))
 
         if len(annotations) == 0:
             continue
 
-        resized_img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, ignore_mask, annotations)
+        resized_img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, annotations, ignore_mask)
 
         # resize to view
         shape = resized_img.shape[1::-1]

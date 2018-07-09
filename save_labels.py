@@ -27,11 +27,11 @@ if __name__ == '__main__':
 
 
         for i in range(len(data_loader)):
-            img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
+            img, img_id, annotations, ignore_mask, _ = data_loader.get_img_annotation(ind=i)
 
             print('{}/{}, img_id: {}'.format(i+1, len(data_loader), img_id))
 
-            resized_img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, ignore_mask, annotations)
+            resized_img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, annotations, ignore_mask)
 
             concat_data = np.concatenate([pafs, heatmaps], axis=0)
 
@@ -40,7 +40,7 @@ if __name__ == '__main__':
             if h > shorter_len and w > shorter_len:
                 shape = (shorter_len, int(h*shorter_len/w)) if h > w else (int(w*shorter_len/h), shorter_len)
                 concat_data = cv2.resize(concat_data.transpose(1, 2, 0), shape, interpolation=cv2.INTER_LINEAR).transpose(2, 0, 1)
-                
+
             print(concat_data.shape)
 
             if args.dry_run:
