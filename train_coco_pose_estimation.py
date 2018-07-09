@@ -499,11 +499,14 @@ if __name__ == '__main__':
     if args.loaderjob:
         multiprocessing.set_start_method('spawn')  # to avoid MultiprocessIterator's bug
         train_iter = chainer.iterators.MultiprocessIterator(
-            train_loader, args.batchsize, n_processes=args.loaderjob)
+            train_loader, args.batchsize, n_processes=args.loaderjob,
+            n_prefetch=2)
         val_iter = chainer.iterators.MultiprocessIterator(
-            val_loader, args.valbatchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
+            val_loader, args.valbatchsize, n_processes=args.loaderjob,
+            repeat=False, shuffle=False, n_prefetch=2)
         # eval_iter = chainer.iterators.MultiprocessIterator(
-        #     eval_loader, 1, n_processes=args.loaderjob, repeat=False, shuffle=False, shared_mem=None)
+        #     eval_loader, 1, n_processes=args.loaderjob, repeat=False,
+        #     shuffle=False, shared_mem=None)
     else:
         train_iter = chainer.iterators.SerialIterator(train_loader, args.batchsize)
         val_iter = chainer.iterators.SerialIterator(
