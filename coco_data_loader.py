@@ -329,8 +329,7 @@ class CocoDataLoader(DatasetMixin):
                     heatmap[jointmap > heatmap] = jointmap[jointmap > heatmap]
                     heatmap_max[jointmap > heatmap_max] = jointmap[jointmap > heatmap_max]
             heatmaps = np.vstack((heatmaps, heatmap.reshape((1,) + heatmap.shape)))
-        bg_heatmap = 1 - heatmap_max # background channel
-        heatmaps = np.vstack((heatmaps, bg_heatmap[None]))
+        heatmaps = np.vstack((heatmaps, heatmap_max[None])) # concat backgorund channel
         return heatmaps.astype('f')
 
     def gen_heatmaps2(self, img, poses, scales, sigma):
@@ -342,8 +341,7 @@ class CocoDataLoader(DatasetMixin):
                 jointmaps.append(np.stack([self.gen_heatmap(img.shape[:-1], pose[i], sigma*scale) for i in range(len(JointType))]))
             heatmaps = np.array(jointmaps).max(axis=0)
 
-        bg_heatmap = 1 - heatmaps.max(axis=0) # background channel
-        heatmaps = np.vstack((heatmaps, bg_heatmap[None]))
+        heatmaps = np.vstack((heatmaps, heatmaps.max(axis=0)[None]))
         return heatmaps.astype('f')
 
     def gen_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
