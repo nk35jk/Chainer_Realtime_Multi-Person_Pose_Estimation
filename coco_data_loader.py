@@ -94,7 +94,7 @@ class CocoDataLoader(DatasetMixin):
         ignore_mask = cv2.resize(ignore_mask.astype(np.uint8), shape).astype('bool')
         poses[:, :, :2] = (poses[:, :, :2] * np.array(shape) / np.array((img_w, img_h)))
 
-        if label:
+        if label is not None:
             import ipdb; ipdb.set_trace()
 
         return resized_img, ignore_mask, poses, label
@@ -141,7 +141,7 @@ class CocoDataLoader(DatasetMixin):
         rotate_img = cv2.warpAffine(img, R, (int(bbox[0]+0.5), int(bbox[1]+0.5)), flags=cv2.INTER_CUBIC,
                                     borderMode=cv2.BORDER_CONSTANT, borderValue=(104, 117, 123))
         rotate_mask = cv2.warpAffine(mask.astype('uint8')*255, R, (int(bbox[0]+0.5), int(bbox[1]+0.5))) > 0
-        if label:
+        if label is not None:
             import ipdb; ipdb.set_trace()
 
         tmp_poses = np.ones_like(poses)
@@ -184,7 +184,7 @@ class CocoDataLoader(DatasetMixin):
 
             crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
             crop_mask[y_from:y_to+1, x_from:x_to+1] = ignore_mask[y1:y2+1, x1:x2+1].copy()
-            if label:
+            if label is not None:
                 import ipdb; ipdb.set_trace()
 
             poses[:, :, :2] -= offset
@@ -196,7 +196,7 @@ class CocoDataLoader(DatasetMixin):
                 y1 = random.randint(0, h - self.insize)
                 x1 = random.randint(0, w - self.insize)
                 crop_img = img[y1:y1+self.insize, x1:x1+self.insize].copy()
-                if label:
+                if label is not None:
                     import ipdb; ipdb.set_trace()
             else:
                 center = np.array([w/2, h/2]).astype('i')
@@ -218,7 +218,7 @@ class CocoDataLoader(DatasetMixin):
                 y_to = self.insize - offset_[1] - 1 if offset_[1] >= 0 else self.insize - 1
 
                 crop_img[y_from:y_to+1, x_from:x_to+1] = img[y1:y2+1, x1:x2+1].copy()
-                if label:
+                if label is not None:
                     import ipdb; ipdb.set_trace()
 
         return crop_img.astype('uint8'), crop_mask, poses, label
@@ -255,7 +255,7 @@ class CocoDataLoader(DatasetMixin):
         swap_joints(poses, JointType.LeftKnee, JointType.RightKnee)
         swap_joints(poses, JointType.LeftFoot, JointType.RightFoot)
 
-        if label:
+        if label is not None:
             import ipdb; ipdb.set_trace()
         return flipped_img, flipped_mask, poses, label
 
