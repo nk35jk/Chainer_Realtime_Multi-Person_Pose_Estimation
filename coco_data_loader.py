@@ -271,7 +271,6 @@ class CocoDataLoader(DatasetMixin):
             label[joint_type_2] = tmp
 
         def swap_pafs(label, limb1, limb2):
-            import ipdb; ipdb.set_trace()
             tmp = label[limb1*2:limb1*2+2].copy()
             label[limb1*2:limb1*2+2] = label[limb2*2:limb2*2+2]
             label[limb2*2:limb2*2+2] = tmp
@@ -543,10 +542,13 @@ class CocoDataLoader(DatasetMixin):
         if self.resize_data_:
             img, ignore_mask, poses, label = self.resize_data(img, ignore_mask, poses, (self.insize, self.insize), label)
 
-        if label is not None:
+        if label is None:
             heatmaps = self.gen_heatmaps(img, poses, scales, params['heatmap_sigma'])
             pafs = self.gen_pafs(img, poses, scales, params['paf_sigma'])
             ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
+        else:
+            pafs, heatmaps = np.split(label, [len(params['limbs_point'])*2])
+
         return img, pafs, heatmaps, ignore_mask
 
     def get_example(self, i, img_id=None):
