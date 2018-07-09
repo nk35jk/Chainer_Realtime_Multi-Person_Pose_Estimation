@@ -486,12 +486,12 @@ if __name__ == '__main__':
     coco_val = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_val2017.json'))
     train_loader = CocoDataLoader(coco_dir, coco_train, model.insize, mode='train',
                                   use_all_images=args.use_all_images,
-                                  use_ignore_mask=args.use_ignore_mask
+                                  use_ignore_mask=args.use_ignore_mask,
                                   load_label=True)
     val_loader = CocoDataLoader(coco_dir, coco_val, model.insize, mode='val',
                                 n_samples=args.val_samples,
                                 use_ignore_mask=args.use_ignore_mask,
-                                use_all_images=args.use_all_images
+                                use_all_images=args.use_all_images,
                                 load_label=True)
     # eval_loader = CocoDataLoader(coco_dir, coco_val, model, mode='eval', n_samples=args.eval_samples)
 
