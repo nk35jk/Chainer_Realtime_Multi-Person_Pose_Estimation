@@ -529,7 +529,7 @@ class CocoDataLoader(DatasetMixin):
         if self.resize_data_:
             img, ignore_mask, poses, label = self.resize_data(img, ignore_mask, poses, (self.insize, self.insize), label)
 
-        if not label:
+        if label is not None:
             heatmaps = self.gen_heatmaps(img, poses, scales, params['heatmap_sigma'])
             pafs = self.gen_pafs(img, poses, scales, params['paf_sigma'])
             ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
