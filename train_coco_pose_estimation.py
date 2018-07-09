@@ -88,7 +88,6 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 stage_heatmap_masks = F.resize_images(stage_heatmap_masks.astype('f'), pafs_y.shape[2:]).data > 0
 
             if args.comp_paf:
-                """pafsを補正"""
                 pafs_t_mag = stage_pafs_t[:, ::2]**2 + stage_pafs_t[:, 1::2]**2
                 pafs_t_mag = xp.repeat(pafs_t_mag, 2, axis=1)
                 pafs_teacher_mag = stage_pafs_teacher_comp[:, ::2]**2 + stage_pafs_teacher_comp[:, 1::2]**2
@@ -96,7 +95,6 @@ def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
                 stage_pafs_t[pafs_t_mag < pafs_teacher_mag] = stage_pafs_teacher_comp[pafs_t_mag < pafs_teacher_mag]
 
             if args.comp_heat:
-                """heatmapsを補正"""
                 stage_heatmaps_t[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]] = stage_heatmaps_teacher_comp[:, :-1][stage_heatmaps_t[:, :-1] < stage_heatmaps_teacher_comp[:, :-1]].copy()
                 stage_heatmaps_t[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]] = stage_heatmaps_teacher_comp[:, -1][stage_heatmaps_t[:, -1] > stage_heatmaps_teacher_comp[:, -1]].copy()
 
@@ -153,7 +151,7 @@ class Updater(StandardUpdater):
         optimizer = self.get_optimizer('main')
 
         # Update base network parameters
-        if self.iteration == 4000:
+        if self.iteration == 2000:
             if args.arch == 'posenet':
                 layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                                'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
@@ -368,11 +366,11 @@ def parse_args():
                         help='number of validation samples')
     parser.add_argument('--opt', choices=('adam', 'sgd'), default='adam')
 
-    parser.add_argument('--initial_lr', type=float, default=5e-4)
-    parser.add_argument('--lr_decay_rate', type=float, default=0.5)
+    parser.add_argument('--initial_lr', type=float, default=1e-2) # 5e-4
+    parser.add_argument('--lr_decay_rate', type=float, default=1/3)
     parser.add_argument('--lr_decay_iter', type=int, default=50000)
-    # openpoes/cifar: 5e-4, CPN: 1e-5
-    parser.add_argument('--weight_decay', type=float, default=1e-5)
+    # openpoes/cifar: 5e-4, CPN: 1e-5s
+    parser.add_argument('--weight_decay', type=float, default=5e-5)
 
     parser.add_argument('--val_iter', type=int, default=1000)
     parser.add_argument('--log_iter', type=int, default=20)
@@ -402,6 +400,7 @@ def parse_args():
 
     parser.add_argument('--use_all_images', action='store_true')
     parser.add_argument('--use_ignore_mask', type=int, choices=(0, 1), default=1)
+    parser.add_argument('--load_label', action='store_true')
     parser.add_argument('--test', action='store_true')
 
     args = parser.parse_args()
@@ -487,12 +486,12 @@ if __name__ == '__main__':
     train_loader = CocoDataLoader(coco_dir, coco_train, model.insize, mode='train',
                                   use_all_images=args.use_all_images,
                                   use_ignore_mask=args.use_ignore_mask,
-                                  load_label=True)
+                                  load_label=args.load_label)
     val_loader = CocoDataLoader(coco_dir, coco_val, model.insize, mode='val',
                                 n_samples=args.val_samples,
                                 use_ignore_mask=args.use_ignore_mask,
                                 use_all_images=args.use_all_images,
-                                load_label=True)
+                                load_label=args.load_label)
     # eval_loader = CocoDataLoader(coco_dir, coco_val, model, mode='eval', n_samples=args.eval_samples)
 
     # Set up iterators
