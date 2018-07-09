@@ -525,9 +525,9 @@ class CocoDataLoader(DatasetMixin):
         scales = scales.clip(max=params['max_ratio'])
 
         if self.augment_data_:
-            img, ignore_mask, poses = self.augment_data(img, ignore_mask, poses, label)
+            img, ignore_mask, poses, label = self.augment_data(img, ignore_mask, poses, label)
         if self.resize_data_:
-            img, ignore_mask, poses = self.resize_data(img, ignore_mask, poses, (self.insize, self.insize), label)
+            img, ignore_mask, poses, label = self.resize_data(img, ignore_mask, poses, (self.insize, self.insize), label)
 
         if not label:
             heatmaps = self.gen_heatmaps(img, poses, scales, params['heatmap_sigma'])
