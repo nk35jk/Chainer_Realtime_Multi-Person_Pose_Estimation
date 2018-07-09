@@ -59,6 +59,6 @@ if __name__ == '__main__':
     import time
     import numpy as np
 
-    model = ResNet101()
+    model = ResNet101(dilate=True)
     arr = np.random.randn(1, 3, model.insize, model.insize).astype('f')
     h1s, h2s = model(arr)
