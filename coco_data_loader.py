@@ -574,6 +574,10 @@ class CocoDataLoader(DatasetMixin):
         else:
             pafs, heatmaps = np.split(label, [len(params['limbs_point'])*2])
 
+        if self.stride != 1:
+            y, x = ignore_mask.shape
+            ignore_mask = cv2.resize(ignore_mask.astype(np.uint8), (0, 0), fx=1/self.stride, fy=1/self.stride) > 0
+
         return img, pafs, heatmaps, ignore_mask
 
     def get_example(self, i, img_id=None):
@@ -635,8 +639,8 @@ if __name__ == '__main__':
         # overlay labels
         img_to_show = resized_img.copy()
         # img_to_show = data_loader.overlay_pafs(img_to_show, pafs, .2, .8)
-        img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:len(JointType)].max(axis=0), .5, .5)
-        # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
+        # img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:len(JointType)].max(axis=0), .5, .5)
+        img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
 
         cv2.imshow('w', np.hstack([resized_img, img_to_show]))
         k = cv2.waitKey(0)
