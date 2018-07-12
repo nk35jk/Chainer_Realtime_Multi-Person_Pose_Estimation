@@ -483,12 +483,12 @@ if __name__ == '__main__':
     coco_dir = args.coco_dir or params['coco_dir']
     coco_train = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_val2017.json'))
-    train_loader = CocoDataLoader(coco_dir, coco_train, model.insize, mode='train',
-                                  use_all_images=args.use_all_images,
+    train_loader = CocoDataLoader(coco_dir, coco_train, model.insize, stride=model.downscale,
+                                  mode='train', use_all_images=args.use_all_images,
                                   use_ignore_mask=args.use_ignore_mask,
                                   load_label=args.load_label)
-    val_loader = CocoDataLoader(coco_dir, coco_val, model.insize, mode='val',
-                                n_samples=args.val_samples,
+    val_loader = CocoDataLoader(coco_dir, coco_val, model.insize, stride=model.downscale,
+                                mode='val', n_samples=args.val_samples,
                                 use_ignore_mask=args.use_ignore_mask,
                                 use_all_images=args.use_all_images,
                                 load_label=args.load_label)

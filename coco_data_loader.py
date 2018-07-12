@@ -15,7 +15,7 @@ from entity import JointType, params
 
 class CocoDataLoader(DatasetMixin):
 
-    def __init__(self, coco_dir, coco, insize, mode='train', n_samples=None,
+    def __init__(self, coco_dir, coco, insize, stride=1, mode='train', n_samples=None,
                  use_all_images=False, use_ignore_mask=True, augment_data=True,
                  resize_data=True, load_label=False):
         self.coco_dir = coco_dir
@@ -32,6 +32,7 @@ class CocoDataLoader(DatasetMixin):
             self.imgIds = random.sample(self.imgIds, n_samples)
         print('{} images: {}'.format(mode, len(self)))
         self.insize = insize
+        self.stride = stride
         self.use_ignore_mask = bool(use_ignore_mask)
         self.augment_data_ = augment_data
         self.resize_data_ = resize_data
@@ -43,7 +44,7 @@ class CocoDataLoader(DatasetMixin):
     def overlay_paf(self, img, paf, alpha=0.25, beta=0.75):
         hue = (np.arctan2(paf[1], paf[0]) / np.pi) / -2 + 0.5
         saturation = np.ones_like(hue)
-        value = np.sqrt(paf[0] ** 2 + paf[1] ** 2) * 2  # twiced
+        value = np.sqrt(paf[0] ** 2 + paf[1] ** 2) #* 2  # twice
         value[value > 1.0] = 1.0
         hsv_paf = np.stack([hue*180, saturation*255, value*255]).transpose(1, 2, 0)
         rgb_paf = cv2.cvtColor(hsv_paf.astype(np.uint8), cv2.COLOR_HSV2BGR)
@@ -311,6 +312,8 @@ class CocoDataLoader(DatasetMixin):
     def gen_heatmap(self, shape, joint, sigma):
         """return shape: (height, width)"""
         x, y, v = joint
+        x /= self.stride
+        y /= self.stride
         if v == 0:
             return np.zeros(shape)
         grid_x = np.tile(np.arange(shape[1]), (shape[0], 1))
@@ -320,13 +323,14 @@ class CocoDataLoader(DatasetMixin):
         return gaussian_heatmap
 
     def gen_heatmaps(self, img, poses, scales, sigma):
-        heatmaps = np.zeros((0,) + img.shape[:-1])
-        heatmap_max = np.zeros(img.shape[:-1])
+        shape = tuple(np.array(img.shape[:-1]) // self.stride)
+        heatmaps = np.zeros((0,) + shape)
+        heatmap_max = np.zeros(shape)
         for joint_index in range(len(JointType)):
-            heatmap = np.zeros(img.shape[:-1])
+            heatmap = np.zeros(shape)
             for pose, scale in zip(poses, scales):
                 if pose[joint_index, 2] > 0:
-                    jointmap = self.gen_heatmap(img.shape[:-1], pose[joint_index], sigma*scale)
+                    jointmap = self.gen_heatmap(shape, pose[joint_index], sigma*scale/self.stride)
                     heatmap[jointmap > heatmap] = jointmap[jointmap > heatmap]
                     heatmap_max[jointmap > heatmap_max] = jointmap[jointmap > heatmap_max]
             heatmaps = np.vstack((heatmaps, heatmap.reshape((1,) + heatmap.shape)))
@@ -334,20 +338,25 @@ class CocoDataLoader(DatasetMixin):
         return heatmaps.astype('f')
 
     def gen_heatmaps2(self, img, poses, scales, sigma):
-        heatmaps = np.zeros((len(JointType),) + img.shape[:-1])
+        shape = img.shape[:-1]
+        heatmaps = np.zeros((len(JointType),) + shape)
 
         if len(poses) > 0:
             jointmaps = []
             for pose, scale in zip(poses, scales):
-                jointmaps.append(np.stack([self.gen_heatmap(img.shape[:-1], pose[i], sigma*scale) for i in range(len(JointType))]))
+                jointmaps.append(np.stack([self.gen_heatmap(shape, pose[i], sigma*scale) for i in range(len(JointType))]))
             heatmaps = np.array(jointmaps).max(axis=0)
 
         heatmaps = np.vstack((heatmaps, heatmaps.max(axis=0)[None]))
         return heatmaps.astype('f')
 
-    def gen_constant_paf(self, shape, joint_from, joint_to, paf_sigma, scale=1):
-        """return shape: (2, height, width)"""
-        if np.array_equal(joint_from, joint_to): # same joint
+    def gen_constant_paf(self, shape, joint_from, joint_to, sigma):
+        v_from = joint_from[-1]
+        v_to = joint_to[-1]
+        joint_from = joint_from[:-1] / self.stride
+        joint_to = joint_to[:-1] / self.stride
+
+        if np.array_equal(joint_from, joint_to) or v_from == 0 or v_to == 0:
             return np.zeros((2,) + shape)
 
         joint_distance = np.linalg.norm(joint_to - joint_from)
@@ -360,19 +369,18 @@ class CocoDataLoader(DatasetMixin):
         inner_product_h = unit_vector[0] * (grid_x - joint_from[0]) + unit_vector[1] * (grid_y - joint_from[1])
         paf_flag_h = (0 <= inner_product_h) & (inner_product_h <= joint_distance)
         inner_product_v = unit_vector_v[0] * (grid_x - joint_from[0]) + unit_vector_v[1] * (grid_y - joint_from[1])
-        paf_flag_v = np.abs(inner_product_v) <= paf_sigma
+        paf_flag_v = np.abs(inner_product_v) <= sigma
         paf_flag = paf_flag_h & paf_flag_v
         constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape + (2,)).transpose(2, 0, 1)
         return constant_paf
 
     def gen_round_constant_paf(self, shape, joint_from, joint_to, sigma):
-        """return shape: (2, height, width)"""
         v_from = joint_from[-1]
         v_to = joint_to[-1]
-        joint_from = joint_from[:-1]
-        joint_to = joint_to[:-1]
+        joint_from = joint_from[:-1] / self.stride
+        joint_to = joint_to[:-1] / self.stride
 
-        if np.array_equal(joint_from, joint_to) or v_from == 0 or v_to == 0: # same joint
+        if np.array_equal(joint_from, joint_to) or v_from == 0 or v_to == 0:
             return np.zeros((2,) + shape)
 
         joint_distance = np.linalg.norm(joint_to - joint_from)
@@ -392,13 +400,34 @@ class CocoDataLoader(DatasetMixin):
         constant_paf = np.stack((paf_flag, paf_flag)) * np.broadcast_to(unit_vector, shape + (2,)).transpose(2, 0, 1) # 220
         return constant_paf
 
+    def gen_line_paf(self, shape, joint_from, joint_to, sigma):
+        v_from = joint_from[-1]
+        v_to = joint_to[-1]
+        joint_from = joint_from[:-1] // self.stride
+        joint_to = joint_to[:-1] // self.stride
+
+        if np.array_equal(joint_from, joint_to) or v_from == 0 or v_to == 0:
+            return np.zeros((2,) + shape)
+
+        joint_distance = np.linalg.norm(joint_to - joint_from)
+        unit_vector = (joint_to - joint_from) / joint_distance
+
+        map_ = np.zeros((2,) + shape)
+        map_ = np.zeros(shape)
+        cv2.line(map_, tuple(joint_from), tuple(joint_to), 1, int(sigma*2))
+        map_ = cv2.GaussianBlur(map_, (3, 3), 0)
+        paf = np.repeat(map_[None], 2, axis=0)
+        paf[0] *= unit_vector[0]
+        paf[1] *= unit_vector[1]
+        return paf
+
     def gen_gaussian_paf(self, shape, joint_from, joint_to, sigma):
         v_from = joint_from[-1]
         v_to = joint_to[-1]
-        joint_from = joint_from[:-1]
-        joint_to = joint_to[:-1]
+        joint_from = joint_from[:-1] / self.stride
+        joint_to = joint_to[:-1] / self.stride
 
-        if np.array_equal(joint_from, joint_to):
+        if np.array_equal(joint_from, joint_to) or v_from == 0 or v_to == 0:
             return np.zeros((2,) + shape)
 
         joint_distance = np.linalg.norm(joint_to - joint_from)
@@ -421,16 +450,17 @@ class CocoDataLoader(DatasetMixin):
         return gaussian_paf
 
     def gen_pafs(self, img, poses, scales, sigma):
-        pafs = np.zeros((0,) + img.shape[:-1])
+        shape = tuple(np.array(img.shape[:-1]) // self.stride)
+        pafs = np.zeros((0,) + shape)
 
         for limb in params['limbs_point']:
-            paf = np.zeros((2,) + img.shape[:-1])
+            paf = np.zeros((2,) + shape)
             paf_flags = np.zeros(paf.shape)
 
             for pose, scale in zip(poses, scales):
                 joint_from, joint_to = pose[limb]
                 if joint_from[2] > 0 and joint_to[2] > 0:
-                    limb_paf = self.gen_round_constant_paf(img.shape[:-1], joint_from, joint_to, sigma*scale)
+                    limb_paf = self.gen_line_paf(shape, joint_from, joint_to, sigma*scale/self.stride)
                     limb_paf_flags = limb_paf != 0
                     paf_flags += np.broadcast_to(limb_paf_flags[0] | limb_paf_flags[1], limb_paf.shape)
                     paf += limb_paf
@@ -440,8 +470,9 @@ class CocoDataLoader(DatasetMixin):
         return pafs.astype('f')
 
     def gen_pafs2(self, img, poses, scales, sigma):
-        pafs = np.zeros((len(params['limbs_point'])*2,) + img.shape[:-1])
-        pafs_flag = np.zeros((len(params['limbs_point'])*2,) + img.shape[:-1]).astype('i')
+        shape = img.shape[:-1]
+        pafs = np.zeros((len(params['limbs_point'])*2,) + shape)
+        pafs_flag = np.zeros((len(params['limbs_point'])*2,) + shape).astype('i')
         for pose, scale in zip(poses, scales):
             joint_froms, joint_tos = [], []
             for limb in params['limbs_point']:
@@ -449,7 +480,7 @@ class CocoDataLoader(DatasetMixin):
                 joint_froms.append(joint_pair[0])
                 joint_tos.append(joint_pair[1])
 
-            tmp_pafs = np.concatenate([self.gen_round_constant_paf(img.shape[:-1],from_, to, sigma*scale)
+            tmp_pafs = np.concatenate([self.gen_line_paf(shape, from_, to, sigma*scale)
                                        for from_, to in zip(joint_froms, joint_tos)])
             pafs += tmp_pafs
             pafs_flag += tmp_pafs != 0
@@ -527,8 +558,9 @@ class CocoDataLoader(DatasetMixin):
 
     def gen_labels(self, img, annotations, ignore_mask, label=None):
         poses = self.parse_coco_annotation(annotations)
-        scales = np.array([i['area']/params['area_basis'] for i in annotations])**0.5
-        scales = scales.clip(max=params['max_ratio'])
+        # scales = np.array([i['area']/params['area_basis'] for i in annotations])**0.5
+        # scales = scales.clip(max=params['max_ratio'])
+        scales = np.ones(len(annotations))
 
         if self.augment_data_:
             img, ignore_mask, poses, label = self.augment_data(img, ignore_mask, poses, label)
@@ -562,7 +594,7 @@ class CocoDataLoader(DatasetMixin):
 if __name__ == '__main__':
     mode = 'val'  # train, val
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
-    data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'],
+    data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], stride=8,
                                  mode=mode, use_all_images=False, use_ignore_mask=True,
                                  augment_data=True, resize_data=True, load_label=True)
 
@@ -570,6 +602,9 @@ if __name__ == '__main__':
 
     sum_paf_avg_norm = 0
     sum_heatmap_avg_norm = 0
+
+    import time
+    st = time.time()
 
     for i in range(len(data_loader)):
         img, img_id, annotations, ignore_mask, label = data_loader.get_img_annotation(ind=i)
@@ -581,11 +616,13 @@ if __name__ == '__main__':
 
         resized_img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, annotations, ignore_mask)
 
+        print('{:.3f}'.format((time.time()-st)/(i+1)))
+
         # resize to view
         shape = resized_img.shape[1::-1]
-        pafs = cv2.resize(pafs.transpose(1, 2, 0), shape).transpose(2, 0, 1)
-        heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape).transpose(2, 0, 1)
-        ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape) > 0
+        pafs = cv2.resize(pafs.transpose(1, 2, 0), shape, interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
+        heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape, interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
+        ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape, interpolation=cv2.INTER_NEAREST) > 0
 
         paf_avg_norm = np.linalg.norm(pafs, axis=0).mean()
         heatmap_avg_norm = np.linalg.norm(heatmaps[:-1], axis=0).mean()
@@ -597,14 +634,15 @@ if __name__ == '__main__':
 
         # overlay labels
         img_to_show = resized_img.copy()
-        img_to_show = data_loader.overlay_pafs(img_to_show, pafs, .2, .8)
-        # img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:-1].max(axis=0), .5, .5)
+        # img_to_show = data_loader.overlay_pafs(img_to_show, pafs, .2, .8)
+        img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:len(JointType)].max(axis=0), .5, .5)
         # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
 
         cv2.imshow('w', np.hstack([resized_img, img_to_show]))
-        # cv2.imwrite('result/label_ex/{:08d}_gt.jpg'.format(img_ids[i]), np.hstack([resized_img, img_to_show]))
         k = cv2.waitKey(0)
         if k == ord('q'):
             sys.exit()
+        elif k == ord('s'):
+            cv2.imwrite('result/{:08d}_gt.jpg'.format(img_id), np.hstack([resized_img, img_to_show]))
         elif k == ord('d'):
             import ipdb; ipdb.set_trace()

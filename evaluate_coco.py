@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--n_samples', type=int, default=100)
-    parser.add_argument('--vis', action='store_true',
+    parser.add_argument('--display', action='store_true',
                         help='visualize inference results')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
@@ -74,7 +74,7 @@ def evaluate():
             res_dict['keypoints'] = keypoints.ravel()
             res.append(res_dict)
 
-        if args.vis:
+        if args.display:
             img = draw_person_pose(img, poses)
             cv2.imshow('results', img)
             k = cv2.waitKey(1)

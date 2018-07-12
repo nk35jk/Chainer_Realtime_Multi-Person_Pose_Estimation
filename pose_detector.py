@@ -84,7 +84,7 @@ class PoseDetector(object):
     def compute_peaks_from_heatmaps(self, heatmaps):
         """all_peaks: shape = [N, 5], column = (jointtype, x, y, score, index)"""
 
-        heatmaps = heatmaps[:-1]
+        heatmaps = heatmaps[:len(JointType)]
 
         xp = cuda.get_array_module(heatmaps)
 
