@@ -374,7 +374,7 @@ def parse_args():
 
     parser.add_argument('--val_iter', type=int, default=1000)
     parser.add_argument('--log_iter', type=int, default=20)
-    parser.add_argument('--save_iter', type=int, default=2000)
+    parser.add_argument('--save_iter', type=int, default=10000)
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
     parser.add_argument('--coco_dir', help='path of COCO dataset directory')
