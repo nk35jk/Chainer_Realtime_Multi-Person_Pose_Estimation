@@ -519,13 +519,13 @@ if __name__ == '__main__':
     train_loader = CocoDataLoader(coco_dir, coco_train, model.insize,
                                   stride=args.stride, mode='train',
                                   use_all_images=args.use_all_images,
-                                  use_ignore_mask=args.use_ignore_mask
+                                  use_ignore_mask=args.use_ignore_mask,
                                   use_line_paf=args.use_line_paf)
     val_loader = CocoDataLoader(coco_dir, coco_val, model.insize,
                                 stride=args.stride, mode='val',
                                 n_samples=args.val_samples,
                                 use_ignore_mask=args.use_ignore_mask,
-                                use_all_images=args.use_all_images
+                                use_all_images=args.use_all_images,
                                 use_line_paf=args.use_line_paf)
     # eval_loader = CocoDataLoader(coco_dir, coco_val, model, mode='eval',
     #                              n_samples=args.eval_samples)
