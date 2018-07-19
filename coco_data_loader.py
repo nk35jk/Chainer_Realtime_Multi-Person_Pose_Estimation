@@ -17,7 +17,7 @@ class CocoDataLoader(DatasetMixin):
 
     def __init__(self, coco_dir, coco, insize, stride=1, mode='train',
                  n_samples=None, use_all_images=False, use_ignore_mask=True,
-                 augment_data=True,resize_data=True):
+                 augment_data=True, resize_data=True, use_line_paf=False):
         self.coco_dir = coco_dir
         self.coco = coco
         assert mode in ['train', 'val', 'eval'], 'Data loading mode is invalid.'
@@ -36,6 +36,7 @@ class CocoDataLoader(DatasetMixin):
         self.use_ignore_mask = bool(use_ignore_mask)
         self.augment_data_ = augment_data
         self.resize_data_ = resize_data
+        self.use_line_paf = use_line_paf
 
     def __len__(self):
         return len(self.imgIds)
@@ -406,7 +407,10 @@ class CocoDataLoader(DatasetMixin):
             for pose, scale in zip(poses, scales):
                 joint_from, joint_to = pose[limb]
                 if joint_from[2] > 0 and joint_to[2] > 0:
-                    limb_paf = self.gen_paf(shape, joint_from, joint_to, sigma*scale/self.stride)
+                    if self.use_line_paf:
+                        limb_paf = self.gen_line_paf(shape, joint_from, joint_to, sigma*scale/self.stride)
+                    else:
+                        limb_paf = self.gen_paf(shape, joint_from, joint_to, sigma*scale/self.stride)
                     limb_paf_flags = limb_paf != 0
                     paf_flags += np.broadcast_to(limb_paf_flags[0] | limb_paf_flags[1], limb_paf.shape)
                     paf += limb_paf
