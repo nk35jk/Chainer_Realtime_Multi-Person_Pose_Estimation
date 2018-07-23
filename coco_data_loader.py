@@ -361,7 +361,6 @@ class CocoDataLoader(DatasetMixin):
         map_ = np.zeros((2,) + shape)
         map_ = np.zeros(shape)
         cv2.line(map_, tuple(joint_from), tuple(joint_to), 1, int(sigma*2))
-        # map_ = cv2.GaussianBlur(map_, (3, 3), 0)
         paf = np.repeat(map_[None], 2, axis=0)
         paf[0] *= unit_vector[0]
         paf[1] *= unit_vector[1]
