@@ -536,7 +536,7 @@ if __name__ == '__main__':
         #     eval_loader, 1, repeat=False, shuffle=False)
     else:
         # to avoid MultiprocessIterator's bug
-        # multiprocessing.set_start_method('spawn')
+        multiprocessing.set_start_method('spawn')
         train_iter = chainer.iterators.MultiprocessIterator(
             train_loader, args.batchsize, n_processes=args.loaderjob,
             n_prefetch=2)
