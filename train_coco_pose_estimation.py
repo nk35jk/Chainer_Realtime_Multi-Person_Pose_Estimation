@@ -18,28 +18,13 @@ import chainer
 from chainer import cuda, training, reporter, function
 from chainer.training import StandardUpdater, extensions
 from chainer import serializers, optimizers, functions as F
+from chainer.training.triggers import ManualScheduleTrigger
 
 from entity import JointType, params
 from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
 from models import posenet, nn1
-
-
-class GradientScaling(object):
-
-    name = 'GradientScaling'
-
-    def __init__(self, layer_names, scale):
-        self.layer_names = layer_names
-        self.scale = scale
-
-    def __call__(self, opt):
-        for layer_name in self.layer_names:
-            for param in opt.target[layer_name].params(False):
-                grad = param.grad
-                with cuda.get_device_from_array(grad):
-                    grad *= self.scale
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
@@ -191,7 +176,7 @@ class Updater(StandardUpdater):
                                'conv4_1', 'conv4_2']
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch in ['resnetfpn', 'pspnet', 'cpn',
+            elif args.arch in ['fpn', 'pspnet', 'cpn',
                                'resnet50', 'resnet101', 'resnet152',
                                'resnet50-dilate', 'resnet101-dilate',
                                'resnet152-dilate']:
@@ -374,6 +359,7 @@ class Evaluator(extensions.Evaluator):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train pose estimation')
 
+    # model
     parser.add_argument('--arch', '-a', choices=params['archs'].keys(),
                         default='posenet',
                         help='model architecture')
@@ -382,31 +368,31 @@ def parse_args():
     parser.add_argument('--initmodel',
                         help='initialize the model from given file')
 
+    # training
     parser.add_argument('--batchsize', '-B', type=int, default=10,
                         help='learning minibatch size')
     parser.add_argument('--valbatchsize', '-b', type=int, default=4,
                         help='validation minibatch size')
-    parser.add_argument('--iteration', '-i', type=int, default=300000,
+    parser.add_argument('--iteration', '-i', type=int, default=240000,
                         help='number of iterations to train')
-    parser.add_argument('--loaderjob', '-j', type=int, default=1,
-                        help='number of parallel data loading processes')
+    parser.add_argument('--opt', choices=('adam', 'sgd'), default='adam')
+    parser.add_argument('--initial_lr', type=float, default=1e-2) # 5e-4
+    parser.add_argument('--lr_decay_rate', type=float, default=.1)
+    parser.add_argument('--lr_decay_iter', type=int, nargs='*',
+                        default=[140000, 210000])
+    # openpoes/cifar: 5e-4, CPN: 1e-5s
+    parser.add_argument('--weight_decay', type=float, default=5e-5)
     parser.add_argument('--val_samples', type=int, default=100,
                         help='number of validation samples')
     parser.add_argument('--eval_samples', type=int, default=100,
                         help='number of validation samples')
-    parser.add_argument('--opt', choices=('adam', 'sgd'), default='adam')
-
-    parser.add_argument('--initial_lr', type=float, default=1e-2) # 5e-4
-    parser.add_argument('--lr_decay_rate', type=float, default=1/3)
-    parser.add_argument('--lr_decay_iter', type=int, default=50000)
-    # openpoes/cifar: 5e-4, CPN: 1e-5s
-    parser.add_argument('--weight_decay', type=float, default=5e-5)
-
     parser.add_argument('--val_iter', type=int, default=1000)
     parser.add_argument('--log_iter', type=int, default=20)
     parser.add_argument('--save_iter', type=int, default=10000)
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU')
+    parser.add_argument('--loaderjob', '-j', type=int, default=1,
+                        help='number of parallel data loading processes')
     parser.add_argument('--coco_dir', help='path of COCO dataset directory')
     parser.add_argument('--out', '-o', default='result/test',
                         help='output directory')
@@ -460,7 +446,7 @@ if __name__ == '__main__':
         posenet.copy_vgg_params(model)
     elif args.arch in ['nn1']:
         nn1.copy_squeezenet_params(model.squeeze)
-    elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
+    elif args.arch in ['fpn', 'pspnet', 'cpn']:
         chainer.serializers.load_npz('models/resnet50.npz', model.res)
 
     if args.initmodel:
@@ -494,8 +480,17 @@ if __name__ == '__main__':
     if args.arch == 'posenet':
         layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                        'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
-                       'conv4_3_CPM', 'conv4_4_CPM']
-        optimizer.add_hook(GradientScaling(layer_names, 1/4))
+                       'conv4_3_CPM', 'conv4_4_CPM', 'conv5_1_CPM_L1',
+                       'conv5_2_CPM_L1', 'conv5_3_CPM_L1', 'conv5_4_CPM_L1',
+                       'conv5_5_CPM_L1',  'conv5_1_CPM_L2', 'conv5_2_CPM_L2',
+                       'conv5_3_CPM_L2', 'conv5_4_CPM_L2', 'conv5_5_CPM_L2']
+        for layer_name in layer_names:
+            for param in getattr(model, layer_name).params():
+                if args.opt == 'sgd':
+                    param.update_rule.hyperparam.parent.lr *= 1/4
+                elif args.opt == 'adam':
+                    param.update_rule.hyperparam.parent.alpha *= 1/4
+
 
     # Fix base network parameters
     if not args.resume:
@@ -504,7 +499,7 @@ if __name__ == '__main__':
                            'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
             for layer_name in layer_names:
                 model[layer_name].disable_update()
-        elif args.arch in ['resnetfpn', 'pspnet', 'cpn']:
+        elif args.arch in ['fpn', 'pspnet', 'cpn']:
             model.res.disable_update()
         elif args.arch in ['nn1']:
             model.squeeze.disable_update()
@@ -562,10 +557,10 @@ if __name__ == '__main__':
     # trainer.extend(Evaluator(coco_val, eval_iter, model, device=args.gpu),
     #                trigger=val_interval)
     trainer.extend(extensions.LogReport(trigger=log_interval))
-    trainer.extend(extensions.observe_lr())
+    trainer.extend(extensions.observe_lr(), trigger=log_interval)
     trainer.extend(extensions.ExponentialShift(
         'lr' if args.opt == 'sgd' else 'alpha', args.lr_decay_rate),
-        trigger=(args.lr_decay_iter, 'iteration'))
+        trigger=ManualScheduleTrigger(args.lr_decay_iter, 'iteration'))
     trainer.extend(extensions.dump_graph('main/loss'))
     trainer.extend(extensions.ProgressBar(update_interval=1))
     trainer.extend(extensions.PrintReport([

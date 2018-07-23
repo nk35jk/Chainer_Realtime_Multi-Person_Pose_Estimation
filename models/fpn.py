@@ -99,7 +99,7 @@ class ResNet(chainer.Chain):
         return hs
 
 
-class ResNetFPN(chainer.Chain):
+class FPN(chainer.Chain):
     """resnet50-FPN"""
 
     insize = 384
@@ -107,7 +107,7 @@ class ResNetFPN(chainer.Chain):
     pad = 32
 
     def __init__(self, joints=19, limbs=38):
-        super(ResNetFPN, self).__init__()
+        super(FPN, self).__init__()
         with self.init_scope():
             self.res = ResNet()
             self.C5lateral = L.Convolution2D(2048, 256, 1, stride=1, pad=0)
@@ -118,34 +118,6 @@ class ResNetFPN(chainer.Chain):
             self.convP4 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
             self.convP3 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
             self.convP2 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
-
-            self.conv1_stage1_L1 = L.Convolution2D(256, 128, 3, stride=1, pad=1)
-            self.conv2_stage1_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
-            self.conv3_stage1_L1 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
-            self.conv4_stage1_L1 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
-            self.conv5_stage1_L1 = L.Convolution2D(128, limbs, 1, stride=1, pad=0)
-
-            self.conv1_stage1_L2 = L.Convolution2D(256, 128, 3, stride=1, pad=1)
-            self.conv2_stage1_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
-            self.conv3_stage1_L2 = L.Convolution2D(128, 128, 3, stride=1, pad=1)
-            self.conv4_stage1_L2 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
-            self.conv5_stage1_L2 = L.Convolution2D(128, joints, 1, stride=1, pad=0)
-
-            self.conv1_stage2_L1 = L.Convolution2D(256+limbs+joints, 128, 7, stride=1, pad=3)
-            self.conv2_stage2_L1 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv3_stage2_L1 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv4_stage2_L1 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv5_stage2_L1 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv6_stage2_L1 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
-            self.conv7_stage2_L1 = L.Convolution2D(128, limbs, 1, stride=1, pad=0)
-
-            self.conv1_stage2_L2 = L.Convolution2D(256+limbs+joints, 128, 7, stride=1, pad=3)
-            self.conv2_stage2_L2 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv3_stage2_L2 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv4_stage2_L2 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv5_stage2_L2 = L.Convolution2D(128, 128, 7, stride=1, pad=3)
-            self.conv6_stage2_L2 = L.Convolution2D(128, 128, 1, stride=1, pad=0)
-            self.conv7_stage2_L2 = L.Convolution2D(128, joints, 1, stride=1, pad=0)
 
     def __call__(self, x):
         pafs, heatmaps = [], []
@@ -171,41 +143,13 @@ class ResNetFPN(chainer.Chain):
         h = h[:, :, :c2l.shape[2], :c2l.shape[3]] + c2l
         p2 = self.convP2(h)
 
-        h1 = F.relu(self.conv1_stage1_L1(p2))
-        h1 = F.relu(self.conv2_stage1_L1(h1))
-        h1 = F.relu(self.conv3_stage1_L1(h1))
-        h1 = F.relu(self.conv4_stage1_L1(h1))
-        h1 = self.conv5_stage1_L1(h1)
-        pafs.append(h1)
-        h2 = F.relu(self.conv1_stage1_L2(p2))
-        h2 = F.relu(self.conv2_stage1_L2(h2))
-        h2 = F.relu(self.conv3_stage1_L2(h2))
-        h2 = F.relu(self.conv4_stage1_L2(h2))
-        h2 = self.conv5_stage1_L2(h2)
-        heatmaps.append(h2)
+        # TODO: needs fix
 
-        h = F.concat((h1, h2, p2), axis=1)
-        h1 = F.relu(self.conv1_stage2_L1(h))
-        h1 = F.relu(self.conv2_stage2_L1(h1))
-        h1 = F.relu(self.conv3_stage2_L1(h1))
-        h1 = F.relu(self.conv4_stage2_L1(h1))
-        h1 = F.relu(self.conv5_stage2_L1(h1))
-        h1 = F.relu(self.conv6_stage2_L1(h1))
-        h1 = self.conv7_stage2_L1(h1)
-        pafs.append(h1)
-        h2 = F.relu(self.conv1_stage2_L2(h))
-        h2 = F.relu(self.conv2_stage2_L2(h2))
-        h2 = F.relu(self.conv3_stage2_L2(h2))
-        h2 = F.relu(self.conv4_stage2_L2(h2))
-        h2 = F.relu(self.conv5_stage2_L2(h2))
-        h2 = F.relu(self.conv6_stage2_L2(h2))
-        h2 = self.conv7_stage2_L2(h2)
-        heatmaps.append(h2)
         return pafs, heatmaps
 
 
 if __name__ == '__main__':
-    model = ResNetFPN()
+    model = FPN()
     arr = np.random.rand(1, 3, 384, 384).astype('f')
     st = time.time()
     h1s, h2s = model(arr)
