@@ -61,7 +61,7 @@ params = {
         'facenet': FaceNet,
         'handnet': HandNet,
         'nn1': NN1,
-        'fpn': ResNetFPN,
+        'fpn': FPN,
         'resnet50': ResNet50,
         'resnet101': ResNet101,
         'resnet152': ResNet152,

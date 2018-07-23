@@ -1,5 +1,3 @@
-import time
-import numpy as np
 import chainer
 from chainer import functions as F, links as L
 from chainer import initializers
@@ -108,53 +106,54 @@ class FPN(chainer.Chain):
 
     def __init__(self, joints=19, limbs=38):
         super(FPN, self).__init__()
+        self.joints = joints
+        self.limbs = limbs
         with self.init_scope():
             self.res = ResNet()
-            self.C5lateral = L.Convolution2D(2048, 256, 1, stride=1, pad=0)
-            self.C4lateral = L.Convolution2D(1024, 256, 1, stride=1, pad=0)
-            self.C3lateral = L.Convolution2D(512, 256, 1, stride=1, pad=0)
-            self.C2lateral = L.Convolution2D(256, 256, 1, stride=1, pad=0)
-
-            self.convP4 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
-            self.convP3 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
-            self.convP2 = L.Convolution2D(256, 256, 3, stride=1, pad=1)
+            self.C5lateral = L.Convolution2D(2048, 256, 1, 1, 0)
+            self.C4lateral = L.Convolution2D(1024, 256, 1, 1, 0)
+            self.C3lateral = L.Convolution2D(512, 256, 1, 1, 0)
+            self.C2lateral = L.Convolution2D(256, 256, 1, 1, 0)
+            self.convP5 = L.Convolution2D(256, 256, 3, 1, 1)
+            self.convP4 = L.Convolution2D(256, 256, 3, 1, 1)
+            self.convP3 = L.Convolution2D(256, 256, 3, 1, 1)
+            self.convP2 = L.Convolution2D(256, 256, 3, 1, 1)
+            self.head1 = L.Convolution2D(256, 256, 3, 1, 1)
+            self.head2 = L.Convolution2D(256, limbs+joints, 1, 1, 0)
 
     def __call__(self, x):
         pafs, heatmaps = [], []
 
         c2, c3, c4, c5 = self.res(x)
 
-        c5l = self.C5lateral(c5)
-        c4l = self.C4lateral(c4)
-        c3l = self.C3lateral(c3)
         c2l = self.C2lateral(c2)
+        c3l = self.C3lateral(c3)
+        c4l = self.C4lateral(c4)
+        c5l = self.C5lateral(c5)
 
-        p5 = c5l
-
-        h = F.resize_images(p5, (p5.shape[2]*2, p5.shape[3]*2))
+        # p5 = F.relu(self.convP5(c5l))
+        h = F.resize_images(c5l, (c5l.shape[2]*2, c5l.shape[3]*2))
         h = h[:, :, :c4l.shape[2], :c4l.shape[3]] + c4l
-        p4 = self.convP4(h)
-
-        h = F.resize_images(p4, (p4.shape[2]*2, p4.shape[3]*2))
+        # p4 = F.relu(self.convP4(h))
+        h = F.resize_images(h, (h.shape[2]*2, h.shape[3]*2))
         h = h[:, :, :c3l.shape[2], :c3l.shape[3]] + c3l
-        p3 = self.convP3(h)
-
-        h = F.resize_images(p3, (p3.shape[2]*2, p3.shape[3]*2))
+        # p3 = F.relu(self.convP3(h))
+        h = F.resize_images(h, (h.shape[2]*2, h.shape[3]*2))
         h = h[:, :, :c2l.shape[2], :c2l.shape[3]] + c2l
-        p2 = self.convP2(h)
+        p2 = F.relu(self.convP2(h))
+        h = F.relu(self.head1(p2))
+        h = self.head2(h)
 
-        # TODO: needs fix
+        pafs = [h[:, :self.limbs]]
+        heatmaps = [h[:, -self.joints:]]
 
         return pafs, heatmaps
 
 
 if __name__ == '__main__':
-    model = FPN()
-    arr = np.random.rand(1, 3, 384, 384).astype('f')
-    st = time.time()
-    h1s, h2s = model(arr)
+    import time
+    import numpy as np
 
-    import chainer.computational_graph as c
-    g = c.build_computational_graph(h1s)
-    with open('graph.dot', 'w') as o:
-        o.write(g.dump())
+    model = FPN()
+    x_data = np.random.rand(1, 3, 384, 384).astype(np.float32)
+    h1s, h2s = model(x_data)
