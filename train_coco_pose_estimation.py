@@ -478,19 +478,21 @@ if __name__ == '__main__':
         optimizer.add_hook(chainer.optimizer.WeightDecay(args.weight_decay))
 
     if args.arch == 'posenet':
-        layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
-                       'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
-                       'conv4_3_CPM', 'conv4_4_CPM', 'conv5_1_CPM_L1',
-                       'conv5_2_CPM_L1', 'conv5_3_CPM_L1', 'conv5_4_CPM_L1',
-                       'conv5_5_CPM_L1',  'conv5_1_CPM_L2', 'conv5_2_CPM_L2',
-                       'conv5_3_CPM_L2', 'conv5_4_CPM_L2', 'conv5_5_CPM_L2']
+        layer_names = [
+            'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2',
+            'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2', 'conv4_3_CPM',
+            'conv4_4_CPM',
+            'conv5_1_CPM_L1', 'conv5_2_CPM_L1', 'conv5_3_CPM_L1',
+            'conv5_4_CPM_L1', 'conv5_5_CPM_L1',  'conv5_1_CPM_L2',
+            'conv5_2_CPM_L2', 'conv5_3_CPM_L2', 'conv5_4_CPM_L2',
+            'conv5_5_CPM_L2'
+        ]
         for layer_name in layer_names:
             for param in getattr(model, layer_name).params():
                 if args.opt == 'sgd':
-                    param.update_rule.hyperparam.parent.lr *= 1/4
+                    param.update_rule.hyperparam.lr *= 1/4
                 elif args.opt == 'adam':
-                    param.update_rule.hyperparam.parent.alpha *= 1/4
-
+                    param.update_rule.hyperparam.alpha *= 1/4
 
     # Fix base network parameters
     if not args.resume:
@@ -499,13 +501,13 @@ if __name__ == '__main__':
                            'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
             for layer_name in layer_names:
                 model[layer_name].disable_update()
-        elif args.arch in ['fpn', 'pspnet', 'cpn']:
+        elif args.arch in ['fpn', 'pspnet', 'cpn', 'resnet50', 'resnet101',
+                           'resnet152', 'resnet50-dilate', 'resnet101-dilate',
+                           'resnet152-dilate']:
             model.res.disable_update()
         elif args.arch in ['nn1']:
             model.squeeze.disable_update()
-        if args.arch in ['resnet50', 'resnet101', 'resnet152',
-                         'resnet50-dilate', 'resnet101-dilate', 'resnet152-dilate']:
-            model.res.disable_update()
+
 
     # Load datasets
     coco_dir = args.coco_dir or params['coco_dir']
@@ -534,7 +536,7 @@ if __name__ == '__main__':
         #     eval_loader, 1, repeat=False, shuffle=False)
     else:
         # to avoid MultiprocessIterator's bug
-        multiprocessing.set_start_method('spawn')
+        # multiprocessing.set_start_method('spawn')
         train_iter = chainer.iterators.MultiprocessIterator(
             train_loader, args.batchsize, n_processes=args.loaderjob,
             n_prefetch=2)
