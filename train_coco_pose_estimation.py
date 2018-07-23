@@ -380,7 +380,7 @@ def parse_args():
     parser.add_argument('--lr_decay_rate', type=float, default=.1)
     parser.add_argument('--lr_decay_iter', type=int, nargs='*',
                         default=[140000, 210000])
-    # openpoes/cifar: 5e-4, CPN: 1e-5s
+    # openpose/cifar: 5e-4, CPN: 1e-5s
     parser.add_argument('--weight_decay', type=float, default=5e-5)
     parser.add_argument('--val_samples', type=int, default=100,
                         help='number of validation samples')
