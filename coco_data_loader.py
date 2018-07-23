@@ -569,9 +569,9 @@ if __name__ == '__main__':
 
         # resize to view
         shape = resized_img.shape[1::-1]
-        pafs = cv2.resize(pafs.transpose(1, 2, 0), shape, interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
-        heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape, interpolation=cv2.INTER_NEAREST).transpose(2, 0, 1)
-        ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape, interpolation=cv2.INTER_NEAREST) > 0
+        pafs = cv2.resize(pafs.transpose(1, 2, 0), shape, interpolation=1).transpose(2, 0, 1)
+        heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape, interpolation=1).transpose(2, 0, 1)
+        ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape, interpolation=1) > 0
 
         paf_avg_norm = np.linalg.norm(pafs, axis=0).mean()
         heatmap_avg_norm = np.linalg.norm(heatmaps[:-1], axis=0).mean()
