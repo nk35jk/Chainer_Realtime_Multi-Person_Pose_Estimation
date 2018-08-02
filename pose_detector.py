@@ -558,15 +558,17 @@ class PoseDetector(object):
 
         h1s, h2s = self.model(x_data)
 
-        pafs = F.resize_images(h1s[-1], (map_h, map_w)).data[0]
-        heatmaps = F.resize_images(h2s[-1], (map_h, map_w)).data[0]
+        self.pafs = F.resize_images(h1s[-1], (map_h, map_w)).data[0]
+        self.heatmaps = F.resize_images(h2s[-1], (map_h, map_w)).data[0]
 
         if self.device >= 0:
-            pafs = pafs.get()
+            self.pafs = self.pafs.get()
             cuda.get_device_from_id(self.device).synchronize()
         print('forward: {:.2f}s'.format(time.time() - st))
 
-        all_peaks = self.compute_peaks_from_heatmaps(heatmaps)
+        all_peaks = self.compute_peaks_from_heatmaps(self.heatmaps)
+        if self.device >= 0:
+            self.heatmaps = self.heatmaps.get()
         if len(all_peaks) == 0:
             return np.empty((0, len(JointType), 3)), np.empty(0)
         all_connections = self.compute_connections(pafs, all_peaks, map_w, params)

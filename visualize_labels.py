@@ -68,6 +68,8 @@ if __name__ == '__main__':
     mode = 'val'  # train, val, eval
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode)
+    data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode,
+                                 augment_data=False, resize_data=False, use_line_paf=False)
 
     pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=True, stages=args.stages)
 
@@ -110,8 +112,8 @@ if __name__ == '__main__':
             out_h = params['insize']
         resized_img, ignore_mask, resized_poses = data_loader.resize_data(img, ignore_mask, poses, shape=(out_w, out_h))
 
-        heatmaps = data_loader.generate_heatmaps(resized_img, resized_poses, params['heatmap_sigma'])
-        pafs = data_loader.generate_pafs(resized_img, resized_poses, params['paf_sigma'])
+        heatmaps = data_loader.gen_heatmaps(resized_img, resized_poses, params['heatmap_sigma'])
+        pafs = data_loader.gen_pafs(resized_img, resized_poses, params['paf_sigma'])
         ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
 
         # resize to view
@@ -166,7 +168,7 @@ if __name__ == '__main__':
             cocoEval.summarize()
             ap = cocoEval.stats[0]
 
-        # """Save output heatmaps and pafs (channel-wise)"""
+        """Save output heatmaps and pafs (channel-wise)"""
         # # heatmaps
         # for i, heatmap in enumerate(pose_detector.heatmaps):
         #     rgb_heatmap = cv2.applyColorMap((heatmap.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
