@@ -579,11 +579,6 @@ if __name__ == '__main__':
         paf_avg_norm = np.linalg.norm(pafs, axis=0).mean()
         heatmap_avg_norm = np.linalg.norm(heatmaps[:-1], axis=0).mean()
 
-        sum_paf_avg_norm += paf_avg_norm
-        sum_heatmap_avg_norm += heatmap_avg_norm
-        # print('{:.3f}'.format(sum_paf_avg_norm))
-        # print('{:.3f}'.format(sum_heatmap_avg_norm))
-
         # overlay labels
         img_to_show = resized_img.copy()
         img_to_show = data_loader.overlay_pafs(img_to_show, pafs, .3, .7)

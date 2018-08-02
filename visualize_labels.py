@@ -42,13 +42,6 @@ def parse_args():
     params['downscale'] = params['archs'][args.arch].downscale
     params['pad'] = params['archs'][args.arch].pad
     params['inference_scales'] = [1]
-    params['insize'] = 368
-    params['paf_sigma'] = 8
-    params['heatmap_sigma'] = 7
-    params['min_scale'] = 1
-    params['max_scale'] = 1
-    params['max_rotate_degree'] = 0
-    params['center_perterb_max'] = 0
     return args
 
 
@@ -67,7 +60,6 @@ if __name__ == '__main__':
 
     mode = 'val'  # train, val, eval
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
-    data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode)
     data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode,
                                  augment_data=False, resize_data=False, use_line_paf=False)
 
@@ -102,41 +94,22 @@ if __name__ == '__main__':
 
         # print('\r{}'.format(img_id), end='')
 
-        poses = data_loader.parse_coco_annotation(annotations)
-        h, w = img.shape[:2]
-        if h > w:
-            out_h = h * params['insize'] // w
-            out_w = params['insize']
-        else:
-            out_w = w * params['insize'] // h
-            out_h = params['insize']
-        resized_img, ignore_mask, resized_poses = data_loader.resize_data(img, ignore_mask, poses, shape=(out_w, out_h))
-
-        heatmaps = data_loader.gen_heatmaps(resized_img, resized_poses, params['heatmap_sigma'])
-        pafs = data_loader.gen_pafs(resized_img, resized_poses, params['paf_sigma'])
-        ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
+        img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, annotations, ignore_mask)
 
         # resize to view
-        shape = tuple(reversed(resized_img.shape[:2]))
+        shape = img.shape[1::-1]
         pafs = cv2.resize(pafs.transpose(1, 2, 0), shape).transpose(2, 0, 1)
         heatmaps = cv2.resize(heatmaps.transpose(1, 2, 0), shape).transpose(2, 0, 1)
         ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape) > 0
 
         # overlay labels
-        img_to_show = resized_img.copy()
-        # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask)
-        img_to_show = data_loader.overlay_pafs(img_to_show, pafs)
-        cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_pafs.jpg'.format(img_id)), img_to_show)
-        heatmaps_to_show = data_loader.overlay_heatmap(resized_img.copy(), heatmaps[:-1].max(axis=0))
+        cv2.imwrite(os.path.join(output_dir, '{:08d}.jpg'.format(img_id)), img)
+        pafs_to_show = data_loader.overlay_pafs(img.copy(), pafs, .3, .7)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_pafs.jpg'.format(img_id)), pafs_to_show)
+        heatmaps_to_show = data_loader.overlay_heatmap(
+            img.copy(), heatmaps[:len(JointType)].max(axis=0), .5, .5)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_heatmaps.jpg'.format(img_id)), heatmaps_to_show)
-        cv2.imwrite(os.path.join(output_dir, '{:08d}.jpg'.format(img_id)), resized_img)
-
-        cv2.imshow('w', np.hstack([resized_img, img_to_show]))
-        k = cv2.waitKey(1)
-        if k == ord('q'):
-            sys.exit()
-        elif k == ord('d'):
-            import ipdb; ipdb.set_trace()
+        # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
 
         """inference"""
         poses, scores = pose_detector(img)
@@ -202,17 +175,17 @@ if __name__ == '__main__':
         comp_heatmaps_t[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]] = heatmaps_teacher[:, -1][comp_heatmaps_t[:, -1] > heatmaps_teacher[:, -1]].copy()
 
         # overlay labels
-        pafs_to_show = data_loader.overlay_pafs(resized_img.copy(), pafs_teacher)
-        heatmaps_to_show = data_loader.overlay_heatmap(resized_img.copy(), heatmaps_teacher[:-1].max(axis=0))
+        pafs_to_show = data_loader.overlay_pafs(img.copy(), pafs_teacher)
+        heatmaps_to_show = data_loader.overlay_heatmap(img.copy(), heatmaps_teacher[:-1].max(axis=0))
         cv2.imwrite(os.path.join(output_dir, '{:08d}_pafs.jpg'.format(img_id)), pafs_to_show)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmaps.jpg'.format(img_id)), heatmaps_to_show)
 
-        comp_pafs_to_show = data_loader.overlay_pafs(resized_img.copy(), comp_pafs_t)
+        comp_pafs_to_show = data_loader.overlay_pafs(img.copy(), comp_pafs_t)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_comp_pafs.jpg'.format(img_id)), comp_pafs_to_show)
-        comp_heatmpas_to_show = data_loader.overlay_heatmap(resized_img.copy(), comp_heatmaps_t[:-1].max(axis=0))
+        comp_heatmpas_to_show = data_loader.overlay_heatmap(img.copy(), comp_heatmaps_t[:-1].max(axis=0))
         cv2.imwrite(os.path.join(output_dir, '{:08d}_comp_heatmaps.jpg'.format(img_id)), comp_heatmpas_to_show)
 
-        cv2.imshow('w', np.hstack([resized_img, comp_pafs_to_show]))
+        cv2.imshow('w', np.hstack([img, comp_pafs_to_show]))
         k = cv2.waitKey(1)
         if k == ord('q'):
             sys.exit()
