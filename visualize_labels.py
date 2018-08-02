@@ -37,7 +37,6 @@ def parse_args():
                         help='number of stages of posenet')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--mask', action='store_true')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -56,9 +55,11 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
-    # img_ids = [326, 395, 459]  # trainのGTのラベルが適切でないもの
+    # trainのGTのラベルが適切でないもの
+    # img_ids = [326, 395, 459]
+    # valのGTのラベルが適切でないもの
     img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
-               62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]  # valのGTのラベルが適切でないもの
+               62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]
 
     output_dir = 'result/visualization'
     if not os.path.exists(output_dir):

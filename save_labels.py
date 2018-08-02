@@ -12,7 +12,8 @@ from coco_data_loader import CocoDataLoader
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dry_run', action='store_true', help='visualize annotations and ignore masks')
+    parser.add_argument('--dry_run', action='store_true',
+                        help='visualize annotations and ignore masks')
     args = parser.parse_args()
 
     for mode in ['train', 'val']:

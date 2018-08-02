@@ -4,13 +4,16 @@ import cv2
 import math
 import random
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.io import loadmat
 
 from chainer.dataset import DatasetMixin
 from pycocotools.coco import COCO
 
 from entity import JointType, params
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 
 class CocoDataLoader(DatasetMixin):
@@ -541,7 +544,7 @@ if __name__ == '__main__':
     data_loader = CocoDataLoader(
         params['coco_dir'], coco, params['insize'], stride=1, mode=mode,
         use_all_images=False, use_ignore_mask=True, augment_data=False,
-        resize_data=False)
+        resize_data=True, use_line_paf=True)
 
     # cv2.namedWindow('w', cv2.WINDOW_NORMAL)
 
@@ -553,10 +556,10 @@ if __name__ == '__main__':
 
     img_ids = [1296, 4395, 18193, 50811, 131444, 143572]
 
-    # for i in range(len(data_loader)):
-    for i in img_ids:
-        # img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
-        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(img_id=i)
+    for i in range(len(data_loader)):
+    # for i in img_ids:
+        img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
+        # img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(img_id=i)
 
         print('img_id: {}'.format(img_id))
 
@@ -584,8 +587,8 @@ if __name__ == '__main__':
         # overlay labels
         img_to_show = resized_img.copy()
         img_to_show = data_loader.overlay_pafs(img_to_show, pafs, .3, .7)
-        img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:len(JointType)].max(axis=0), .5, .5)
-        img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
+        # img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:len(JointType)].max(axis=0), .5, .5)
+        # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
 
         cv2.imshow('w', np.hstack([resized_img, img_to_show]))
         k = cv2.waitKey(0)

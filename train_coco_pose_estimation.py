@@ -9,7 +9,6 @@ import datetime
 import subprocess
 import numpy as np
 import multiprocessing
-import matplotlib.pyplot as plt
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -25,6 +24,10 @@ from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
 from models import posenet, nn1
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,
@@ -171,15 +174,15 @@ class Updater(StandardUpdater):
         # Update base network parameters
         if self.iteration == 2000:
             if args.arch == 'posenet':
-                layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2',
-                               'conv3_1', 'conv3_2', 'conv3_3', 'conv3_4',
-                               'conv4_1', 'conv4_2']
+                layer_names = [
+                    'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                    'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2'
+                ]
                 for layer_name in layer_names:
                     optimizer.target[layer_name].enable_update()
-            elif args.arch in ['fpn', 'pspnet', 'cpn',
-                               'resnet50', 'resnet101', 'resnet152',
-                               'resnet50-dilate', 'resnet101-dilate',
-                               'resnet152-dilate']:
+            elif args.arch in ['fpn', 'pspnet', 'cpn', 'resnet50', 'resnet101',
+                               'resnet152', 'resnet50-dilate',
+                               'resnet101-dilate', 'resnet152-dilate']:
                 optimizer.target.res.enable_update()
             elif args.arch in ['nn1']:
                 optimizer.target.squeeze.enable_update()
@@ -272,7 +275,6 @@ class Validator(extensions.Evaluator):
         it = copy.copy(val_iter)
 
         summary = reporter.DictSummary()
-        res = []
         for i, batch in enumerate(it):
             observation = {}
             with reporter.report_scope(observation):
@@ -398,6 +400,7 @@ def parse_args():
                         help='output directory')
     parser.add_argument('--resume', '-r', default='',
                         help='initialize the trainer from given file')
+    parser.add_argument('--seed', type=int, default=0)
 
     # distillation params
     parser.add_argument('--distill', action='store_true')
@@ -431,8 +434,10 @@ if __name__ == '__main__':
 
     print(json.dumps(vars(args), sort_keys=True, indent=4))
 
-    np.random.seed(0)
-    random.seed(0)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    if args.gpu >= 0:
+        cuda.cupy.random.seed(args.seed)
 
     # Prepare model
     if args.arch == 'posenet':
@@ -472,21 +477,14 @@ if __name__ == '__main__':
     if args.opt == 'sgd':
         optimizer = optimizers.MomentumSGD(lr=args.initial_lr, momentum=0.9)
     elif args.opt == 'adam':
-        optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999, eps=1e-08)
+        optimizer = optimizers.Adam(alpha=1e-4, beta1=0.9, beta2=0.999)
     optimizer.setup(model)
     if args.opt == 'sgd':
         optimizer.add_hook(chainer.optimizer.WeightDecay(args.weight_decay))
 
     if args.arch == 'posenet':
-        layer_names = [
-            'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2',
-            'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2', 'conv4_3_CPM',
-            'conv4_4_CPM',
-            'conv5_1_CPM_L1', 'conv5_2_CPM_L1', 'conv5_3_CPM_L1',
-            'conv5_4_CPM_L1', 'conv5_5_CPM_L1',  'conv5_1_CPM_L2',
-            'conv5_2_CPM_L2', 'conv5_3_CPM_L2', 'conv5_4_CPM_L2',
-            'conv5_5_CPM_L2'
-        ]
+        layer_names = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                       'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2']
         for layer_name in layer_names:
             for param in getattr(model, layer_name).params():
                 if args.opt == 'sgd':
@@ -508,8 +506,7 @@ if __name__ == '__main__':
         elif args.arch in ['nn1']:
             model.squeeze.disable_update()
 
-
-    # Load datasets
+    # Set up data loader
     coco_dir = args.coco_dir or params['coco_dir']
     coco_train = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_train2017.json'))
     coco_val = COCO(os.path.join(coco_dir, 'annotations/person_keypoints_val2017.json'))
@@ -569,13 +566,11 @@ if __name__ == '__main__':
         'epoch', 'iteration', 'main/loss', 'val/loss', 'main/paf', 'val/paf',
         'main/heat', 'val/heat' # 'AP', 'AR'
     ]), trigger=log_interval)
-    # trainer.extend(extensions.PlotReport(
-    #     ['main/loss', 'val/loss'], x_key='iteration', file_name='loss.png'))
-
-    if not args.test:
-        trainer.extend(extensions.snapshot(), trigger=(args.save_iter, 'iteration'))
-        trainer.extend(extensions.snapshot_object(
-            model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
+    trainer.extend(extensions.PlotReport(
+        ['main/loss', 'val/loss'], x_key='iteration', file_name='loss.png'))
+    trainer.extend(extensions.snapshot(), trigger=(args.save_iter, 'iteration'))
+    trainer.extend(extensions.snapshot_object(
+        model, 'model_iter_{.updater.iteration}'), trigger=val_interval)
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)

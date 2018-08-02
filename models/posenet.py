@@ -1,27 +1,26 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
-
 from chainer.links import caffe
-
-
-def copy_vgg_params(model):
-    print('Copying params of pretrained model...')
-    layer_names = [
-        'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
-        'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
-    ]
-    pre_model = caffe.CaffeFunction('models/VGG_ILSVRC_19_layers.caffemodel')
-    for layer_name in layer_names:
-        exec("model.%s.W.data = pre_model['%s'].W.data" % (layer_name, layer_name))
-        exec("model.%s.b.data = pre_model['%s'].b.data" % (layer_name, layer_name))
-    print('Done.')
 
 
 class PoseNet(chainer.Chain):
 
     insize = 368
     downscale = pad = 8
+
+    @classmethod
+    def copy_vgg_params(cls, model):
+        print('Copying params of pretrained model...')
+        layer_names = [
+            'conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+            'conv3_2', 'conv3_3', 'conv3_4', 'conv4_1', 'conv4_2',
+        ]
+        pre_model = caffe.CaffeFunction('models/VGG_ILSVRC_19_layers.caffemodel')
+        for layer_name in layer_names:
+            exec("model.%s.W.data = pre_model['%s'].W.data" % (layer_name, layer_name))
+            exec("model.%s.b.data = pre_model['%s'].b.data" % (layer_name, layer_name))
+        print('Done.')
 
     def __init__(self, joints=19, limbs=38, stages=6):
         super(PoseNet, self).__init__()
@@ -141,12 +140,9 @@ class PoseNet(chainer.Chain):
 
 
 if __name__ == '__main__':
-    chainer.config.enable_backprop = False
-    chainer.config.train = False
-
     import time
     import numpy as np
 
     model = PoseNet()
-    arr = np.random.randn(1, 3, model.insize, model.insize).astype('f')
-    h1s, h2s = model(arr)
+    x_data = np.random.randn(1, 3, model.insize, model.insize).astype(np.float32)
+    h1s, h2s = model(x_data)

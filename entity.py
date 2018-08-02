@@ -86,8 +86,8 @@ params = {
     'min_box_size': 64,
     'max_box_size': 512,
     'min_scale': 0.5,
-    'max_scale': 1.3,
-    'max_rotate_degree': 30,
+    'max_scale': 1,8,
+    'max_rotate_degree': 40,
     'center_perterb_max': 60,
 
     'teacher_path': 'models/posenet_190k_ap_0.544.npz',
@@ -97,7 +97,6 @@ params = {
     # inference params
     'inference_img_size': 368,
     'inference_scales': [0.5, 1, 1.5, 2],
-    # 'inference_scales': [1],
     'heatmap_size': 320,
     'gaussian_sigma': 2.5,
     'ksize': 17,
