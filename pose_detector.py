@@ -580,7 +580,7 @@ class PoseDetector(object):
         return poses, scores
 
 
-def draw_person_pose(orig_img, poses):
+def draw_person_pose(orig_img, poses, p_size=3):
     if len(poses) == 0:
         return orig_img
 
@@ -612,7 +612,7 @@ def draw_person_pose(orig_img, poses):
     for pose in poses.round().astype('i'):
         for i, ((x, y, v), color) in enumerate(zip(pose, joint_colors)):
             if v != 0:
-                cv2.circle(canvas, (x, y), 3, color, -1)
+                cv2.circle(canvas, (x, y), p_size, color, -1)
     return canvas
 
 if __name__ == '__main__':

@@ -37,6 +37,7 @@ def parse_args():
                         help='number of stages of posenet')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--out', '-o', default='result/heatmap')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -51,29 +52,34 @@ if __name__ == '__main__':
     # trainのGTのラベルが適切でないもの
     # img_ids = [326, 395, 459]
     # valのGTのラベルが適切でないもの
-    img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
-               62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]
+    # img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
+    #            62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]
 
-    output_dir = 'result/visualization'
+    path = 'result/visualization/heatmap_img_list.txt'
+    img_ids = list(map(int, (open(path).read().split())))
+
+    output_dir = args.out
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     mode = 'val'  # train, val, eval
-    coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
-    data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'], mode=mode,
-                                 augment_data=False, resize_data=False, use_line_paf=False)
+    coco = COCO(os.path.join(
+        params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
+    data_loader = CocoDataLoader(params['coco_dir'], coco, params['insize'],
+                                 mode=mode, augment_data=False,
+                                 resize_data=False, use_line_paf=False)
 
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu, precise=True, stages=args.stages)
+    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu,
+                                 precise=True, stages=args.stages)
 
     # save css file
     with open(os.path.join(output_dir, 'style.css'), 'w') as f:
         f.write(
-            '''
-            body {
+         '''body {
               white-space:nowrap;
               font-family: "Hiragino Kaku Gothic ProN"
             }
-            span {
+            span {
               display: inline-block;
               width: 300px;
               text-align: center;
@@ -81,20 +87,36 @@ if __name__ == '__main__':
             img {
               width: 300px;
             }
-            '''
+            div {
+              text-align: center;
+            }'''
         )
 
     # open html file
     f = open(os.path.join(output_dir, 'visualization.html'), 'w')
     f.write('<head><link rel="stylesheet" type="text/css" href="style.css"></head>')
 
-    for img_id in img_ids:
+    for img_id in img_ids[:1000]:
+    # for i in range(len(data_loader)):
+
         """Save ground truth labels"""
         img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(img_id=img_id)
+        # img, img_id, annotations, ignore_mask = data_loader.get_img_annotation(ind=i)
 
-        # print('\r{}'.format(img_id), end='')
+        print(img_id)
 
-        img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, annotations, ignore_mask)
+        poses = data_loader.parse_coco_annotation(annotations)
+        scales = np.ones(len(annotations))
+
+        h, w = img.shape[:2]
+        shape = (int(w*params['insize']/h), params['insize']) if h < w else (params['insize'], int(h*params['insize']/w))
+        img, ignore_mask, poses = data_loader.resize_data(img, ignore_mask, poses, shape)
+
+        heatmaps = data_loader.gen_heatmaps(img, poses, scales, params['heatmap_sigma'])
+        pafs = data_loader.gen_pafs(img, poses, scales, params['paf_sigma'])
+        ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
+
+        # img, pafs, heatmaps, ignore_mask = data_loader.gen_labels(img, annotations, ignore_mask)
 
         # resize to view
         shape = img.shape[1::-1]
@@ -104,12 +126,21 @@ if __name__ == '__main__':
 
         # overlay labels
         cv2.imwrite(os.path.join(output_dir, '{:08d}.jpg'.format(img_id)), img)
-        pafs_to_show = data_loader.overlay_pafs(img.copy(), pafs, .3, .7)
-        cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_pafs.jpg'.format(img_id)), pafs_to_show)
-        heatmaps_to_show = data_loader.overlay_heatmap(
-            img.copy(), heatmaps[:len(JointType)].max(axis=0), .5, .5)
-        cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_heatmaps.jpg'.format(img_id)), heatmaps_to_show)
-        # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
+        pafs_to_show = data_loader.overlay_pafs(img.copy(), pafs, .25, .75)
+        pafs_to_show = data_loader.overlay_ignore_mask(pafs_to_show, ignore_mask, .5, .5)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_pafs_gt.jpg'.format(img_id)), pafs_to_show)
+        # heatmaps_to_show = data_loader.overlay_heatmap(img.copy(), heatmaps[:len(JointType)].max(axis=0), .25, .75)
+        heatmaps_to_show = data_loader.overlay_heatmaps(img.copy(), heatmaps[:len(JointType)], .25, .75)
+        heatmaps_to_show = data_loader.overlay_ignore_mask(heatmaps_to_show, ignore_mask, .5, .5)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmaps_gt.jpg'.format(img_id)), heatmaps_to_show)
+
+        """GT joints"""
+        gt_img = img.copy()
+        for pose in poses.round().astype('i'):
+            for x, y, v in pose:
+                if v != 0:
+                    cv2.circle(gt_img, (x, y), 6, (0, 255, 0), -1)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_joints.jpg'.format(img_id)), gt_img)
 
         """inference"""
         poses, scores = pose_detector(img)
@@ -141,7 +172,7 @@ if __name__ == '__main__':
             cocoEval.summarize()
             ap = cocoEval.stats[0]
 
-        """Save output heatmaps and pafs (channel-wise)"""
+        # """Save output heatmaps and pafs (channel-wise)"""
         # # heatmaps
         # for i, heatmap in enumerate(pose_detector.heatmaps):
         #     rgb_heatmap = cv2.applyColorMap((heatmap.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
@@ -176,48 +207,33 @@ if __name__ == '__main__':
 
         # overlay labels
         pafs_to_show = data_loader.overlay_pafs(img.copy(), pafs_teacher)
-        heatmaps_to_show = data_loader.overlay_heatmap(img.copy(), heatmaps_teacher[:-1].max(axis=0))
+        # heatmaps_to_show = data_loader.overlay_heatmap(img.copy(), heatmaps_teacher[:-1].max(axis=0))
+        heatmaps_to_show = data_loader.overlay_heatmaps(img.copy(), heatmaps_teacher[:len(JointType)], .25, .75)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_pafs.jpg'.format(img_id)), pafs_to_show)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmaps.jpg'.format(img_id)), heatmaps_to_show)
 
         comp_pafs_to_show = data_loader.overlay_pafs(img.copy(), comp_pafs_t)
-        cv2.imwrite(os.path.join(output_dir, '{:08d}_comp_pafs.jpg'.format(img_id)), comp_pafs_to_show)
-        comp_heatmpas_to_show = data_loader.overlay_heatmap(img.copy(), comp_heatmaps_t[:-1].max(axis=0))
-        cv2.imwrite(os.path.join(output_dir, '{:08d}_comp_heatmaps.jpg'.format(img_id)), comp_heatmpas_to_show)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_pafs_comp.jpg'.format(img_id)), comp_pafs_to_show)
+        # comp_heatmpas_to_show = data_loader.overlay_heatmap(img.copy(), comp_heatmaps_t[:-1].max(axis=0))
+        comp_heatmpas_to_show = data_loader.overlay_heatmaps(img.copy(), comp_heatmaps_t[:len(JointType)], .25, .75)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmaps_comp.jpg'.format(img_id)), comp_heatmpas_to_show)
 
-        cv2.imshow('w', np.hstack([img, comp_pafs_to_show]))
-        k = cv2.waitKey(1)
-        if k == ord('q'):
-            sys.exit()
-        elif k == ord('d'):
-            import ipdb; ipdb.set_trace()
+        # cv2.imshow('w', np.hstack([img, comp_pafs_to_show]))
+        # k = cv2.waitKey(1)
+        # if k == ord('q'):
+        #     sys.exit()
+        # elif k == ord('d'):
+        #     import ipdb; ipdb.set_trace()
 
         """heatmap peaks"""
-        joint_colors = [
-            [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0],
-            [85, 255, 0], [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255],
-            [0, 170, 255], [0, 85, 255], [0, 0, 255], [85, 0, 255], [170, 0, 255],
-            [255, 0, 255], [255, 0, 170], [255, 0, 85]]
         peaks_img = img.copy()
         for all_peak in pose_detector.all_peaks:
-            cv2.circle(peaks_img, (int(all_peak[1]), int(all_peak[2])), 4, joint_colors[int(all_peak[0])], -1)
+            cv2.circle(peaks_img, (int(all_peak[1]), int(all_peak[2])), 4, params['joint_colors'][int(all_peak[0])], -1)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_peaks.jpg'.format(img_id)), peaks_img)
 
         """final results"""
         result_img = draw_person_pose(img, poses)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_final_results.jpg'.format(img_id)), result_img)
-
-        """GT joints"""
-        gt_img = img.copy()
-        for ann in annotations:
-            for x, y, v in np.array(ann['keypoints']).reshape(-1, 3):
-                if v == 1:
-                    # cv2.circle(gt_img, (x, y), 4, (255, 255, 0), -1)
-                    cv2.circle(gt_img, (x, y), 8, (0, 255, 0), -1)
-                elif v == 2:
-                    # cv2.circle(gt_img, (x, y), 4, (255, 0, 255), -1)
-                    cv2.circle(gt_img, (x, y), 8, (0, 255, 0), -1)
-        cv2.imwrite(os.path.join(output_dir, '{:08d}_gt_joints.jpg'.format(img_id)), gt_img)
 
         """write html"""
         f.write('<div>')
@@ -226,15 +242,16 @@ if __name__ == '__main__':
         # for i in range(len(pose_detector.pafs)):
         #     f.write('<img src="{}">'.format('{:08d}_abs_paf{}.jpg'.format(img_id, i)))
         f.write(
-            '<img src="{}">'.format('{:08d}_gt_heatmaps.jpg'.format(img_id))
+            # '<img src="{}">'.format('{:08d}.jpg'.format(img_id))
+            '<img src="{}">'.format('{:08d}_gt_joints.jpg'.format(img_id))
+            + '<img src="{}">'.format('{:08d}_heatmaps_gt.jpg'.format(img_id))
             + '<img src="{}">'.format('{:08d}_heatmaps.jpg'.format(img_id))
-            + '<img src="{}">'.format('{:08d}_comp_heatmaps.jpg'.format(img_id))
-            + '<img src="{}">'.format('{:08d}_gt_pafs.jpg'.format(img_id))
+            + '<img src="{}">'.format('{:08d}_heatmaps_comp.jpg'.format(img_id))
+            + '<img src="{}">'.format('{:08d}_pafs_gt.jpg'.format(img_id))
             + '<img src="{}">'.format('{:08d}_pafs.jpg'.format(img_id))
-            + '<img src="{}">'.format('{:08d}_comp_pafs.jpg'.format(img_id))
-            + '<img src="{}">'.format('{:08d}_peaks.jpg'.format(img_id))
-            + '<img src="{}">'.format('{:08d}_final_results.jpg'.format(img_id))
-            + '<img src="{}">'.format('{:08d}_gt_joints.jpg'.format(img_id))
+            + '<img src="{}">'.format('{:08d}_pafs_comp.jpg'.format(img_id))
+            # + '<img src="{}">'.format('{:08d}_peaks.jpg'.format(img_id))
+            # + '<img src="{}">'.format('{:08d}_final_results.jpg'.format(img_id))
             + '\n'
         )
         f.write('</div>')
@@ -246,15 +263,16 @@ if __name__ == '__main__':
         #     txt = '<span>{}-{}</span>'.format(str(limb[0]).split('.')[-1], str(limb[1]).split('.')[-1])
         #     f.write(txt * 2)
 
+        # f.write('<span>image</span>')
+        f.write('<span>GT</span>')
         f.write('<span>GT heatmaps</span>')
         f.write('<span>Output heatmaps</span>')
         f.write('<span>Completed heatmaps</span>')
         f.write('<span>GT PAFs</span>')
         f.write('<span>Output PAFs</span>')
         f.write('<span>Completed PAFs</span>')
-        f.write('<span>peaks</span>')
-        f.write('<span>Final results, AP: {:.3f}</span>'.format(ap))
-        f.write('<span>GT</span>')
+        # f.write('<span>peaks</span>')
+        # f.write('<span>Final results, AP: {:.3f}</span>'.format(ap))
         f.write('</div>')
 
     f.close()

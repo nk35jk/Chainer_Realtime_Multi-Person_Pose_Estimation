@@ -44,17 +44,17 @@ class CocoDataLoader(DatasetMixin):
     def __len__(self):
         return len(self.imgIds)
 
-    def overlay_paf(self, img, paf, alpha=0.25, beta=0.75):
+    def overlay_paf(self, img, paf, alpha, beta):
         hue = (np.arctan2(paf[1], paf[0]) / np.pi) / -2 + 0.5
         saturation = np.ones_like(hue)
-        value = np.sqrt(paf[0] ** 2 + paf[1] ** 2) #* 2  # twice
+        value = np.sqrt(paf[0] ** 2 + paf[1] ** 2) * 2  # twice
         value[value > 1.0] = 1.0
         hsv_paf = np.stack([hue*180, saturation*255, value*255]).transpose(1, 2, 0)
         rgb_paf = cv2.cvtColor(hsv_paf.astype(np.uint8), cv2.COLOR_HSV2BGR)
         img = cv2.addWeighted(img, alpha, rgb_paf, beta, 0)
         return img
 
-    def overlay_pafs(self, img, pafs, alpha=0.25, beta=0.75):
+    def overlay_pafs(self, img, pafs, alpha=.25, beta=.75):
         mix_paf = np.zeros((2,) + img.shape[:-1])
         paf_flags = np.zeros(mix_paf.shape) # for constant paf
 
@@ -67,7 +67,14 @@ class CocoDataLoader(DatasetMixin):
         img = self.overlay_paf(img, mix_paf, alpha, beta)
         return img
 
-    def overlay_heatmap(self, img, heatmap, alpha=0.25, beta=0.75):
+    def overlay_heatmaps(self, img, heatmaps, alpha=.25, beta=.75):
+        rgb_heatmap = np.array(params['joint_colors'])[heatmaps.argmax(axis=0)]
+        max_ = heatmaps.max(axis=0).clip(0, 1)
+        rgb_heatmap = (max_ * rgb_heatmap.transpose(2, 0, 1)).transpose(1, 2, 0).astype(np.uint8)
+        img = cv2.addWeighted(img, alpha, rgb_heatmap, beta, 0)
+        return img
+
+    def overlay_heatmap(self, img, heatmap, alpha=.25, beta=.75):
         rgb_heatmap = cv2.applyColorMap((heatmap * 255).astype(np.uint8), cv2.COLORMAP_JET)
         img = cv2.addWeighted(img, alpha, rgb_heatmap, beta, 0)
         return img
@@ -586,7 +593,7 @@ if __name__ == '__main__':
         # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
 
         cv2.imshow('w', np.hstack([resized_img, img_to_show]))
-        k = cv2.waitKey(0)
+        k = cv2.waitKey(1)
         if k == ord('q'):
             sys.exit()
         elif k == ord('s'):
