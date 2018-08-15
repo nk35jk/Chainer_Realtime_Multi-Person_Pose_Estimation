@@ -550,7 +550,7 @@ if __name__ == '__main__':
     coco = COCO(os.path.join(params['coco_dir'], 'annotations/person_keypoints_{}2017.json'.format(mode)))
     data_loader = CocoDataLoader(
         params['coco_dir'], coco, params['insize'], stride=1, mode=mode,
-        use_all_images=False, use_ignore_mask=True, augment_data=False,
+        use_all_images=False, use_ignore_mask=True, augment_data=True,
         resize_data=True, use_line_paf=True)
 
     # cv2.namedWindow('w', cv2.WINDOW_NORMAL)
@@ -590,10 +590,10 @@ if __name__ == '__main__':
         img_to_show = resized_img.copy()
         img_to_show = data_loader.overlay_pafs(img_to_show, pafs, .3, .7)
         # img_to_show = data_loader.overlay_heatmap(img_to_show, heatmaps[:len(JointType)].max(axis=0), .5, .5)
-        # img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
+        img_to_show = data_loader.overlay_ignore_mask(img_to_show, ignore_mask, .5, .5)
 
         cv2.imshow('w', np.hstack([resized_img, img_to_show]))
-        k = cv2.waitKey(1)
+        k = cv2.waitKey(0)
         if k == ord('q'):
             sys.exit()
         elif k == ord('s'):
