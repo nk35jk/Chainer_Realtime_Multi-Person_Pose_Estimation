@@ -149,33 +149,33 @@ if __name__ == '__main__':
         poses, scores = pose_detector(img)
 
         """evaluation"""
-        res = []
-        for pose, score in zip(poses, scores):
-            res_dict = {}
-            res_dict['category_id'] = 1
-            res_dict['image_id'] = img_id
-            res_dict['score'] = score * sum(pose[:, 2] > 0)
+        # res = []
+        # for pose, score in zip(poses, scores):
+        #     res_dict = {}
+        #     res_dict['category_id'] = 1
+        #     res_dict['image_id'] = img_id
+        #     res_dict['score'] = score * sum(pose[:, 2] > 0)
+        #
+        #     keypoints = np.zeros((len(params['coco_joint_indices']), 3))
+        #     for joint, jt in zip(pose, JointType):
+        #         if joint is not None and jt in params['coco_joint_indices']:
+        #             j = params['coco_joint_indices'].index(jt)
+        #             keypoints[j] = joint
+        #     res_dict['keypoints'] = keypoints.ravel()
+        #     res.append(res_dict)
+        #
+        # if len(res) == 0:
+        #     ap = -1
+        # else:
+        #     cocoDt = coco.loadRes(res)
+        #     cocoEval = COCOeval(coco, cocoDt, 'keypoints')
+        #     cocoEval.params.imgIds = [img_id]
+        #     cocoEval.evaluate()
+        #     cocoEval.accumulate()
+        #     cocoEval.summarize()
+        #     ap = cocoEval.stats[0]
 
-            keypoints = np.zeros((len(params['coco_joint_indices']), 3))
-            for joint, jt in zip(pose, JointType):
-                if joint is not None and jt in params['coco_joint_indices']:
-                    j = params['coco_joint_indices'].index(jt)
-                    keypoints[j] = joint
-            res_dict['keypoints'] = keypoints.ravel()
-            res.append(res_dict)
-
-        if len(res) == 0:
-            ap = -1
-        else:
-            cocoDt = coco.loadRes(res)
-            cocoEval = COCOeval(coco, cocoDt, 'keypoints')
-            cocoEval.params.imgIds = [img_id]
-            cocoEval.evaluate()
-            cocoEval.accumulate()
-            cocoEval.summarize()
-            ap = cocoEval.stats[0]
-
-        # """Save output heatmaps and pafs (channel-wise)"""
+        """Save output heatmaps and pafs (channel-wise)"""
         # # heatmaps
         # for i, heatmap in enumerate(pose_detector.heatmaps):
         #     rgb_heatmap = cv2.applyColorMap((heatmap.clip(0, 1)*255).astype(np.uint8), cv2.COLORMAP_JET)
