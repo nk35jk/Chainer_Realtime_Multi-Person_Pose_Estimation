@@ -129,10 +129,13 @@ if __name__ == '__main__':
         pafs_to_show = data_loader.overlay_pafs(img.copy(), pafs, .25, .75)
         pafs_to_show = data_loader.overlay_ignore_mask(pafs_to_show, ignore_mask, .5, .5)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_pafs_gt.jpg'.format(img_id)), pafs_to_show)
-        # heatmaps_to_show = data_loader.overlay_heatmap(img.copy(), heatmaps[:len(JointType)].max(axis=0), .25, .75)
         heatmaps_to_show = data_loader.overlay_heatmaps(img.copy(), heatmaps[:len(JointType)], .25, .75)
         heatmaps_to_show = data_loader.overlay_ignore_mask(heatmaps_to_show, ignore_mask, .5, .5)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmaps_gt.jpg'.format(img_id)), heatmaps_to_show)
+        labels_to_show = data_loader.overlay_pafs(img.copy(), pafs, .4, .6)
+        labels_to_show = data_loader.overlay_heatmap(labels_to_show, heatmaps[:len(JointType)].max(axis=0), .6, .4)
+        labels_to_show = data_loader.overlay_ignore_mask(labels_to_show, ignore_mask, .5, .5)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_labels_gt.jpg'.format(img_id)), heatmaps_to_show)
 
         """GT joints"""
         gt_img = img.copy()
@@ -244,6 +247,7 @@ if __name__ == '__main__':
         f.write(
             # '<img src="{}">'.format('{:08d}.jpg'.format(img_id))
             '<img src="{}">'.format('{:08d}_gt_joints.jpg'.format(img_id))
+            + '<img src="{}">'.format('{:08d}_labels_gt.jpg'.format(img_id))
             + '<img src="{}">'.format('{:08d}_heatmaps_gt.jpg'.format(img_id))
             + '<img src="{}">'.format('{:08d}_heatmaps.jpg'.format(img_id))
             + '<img src="{}">'.format('{:08d}_heatmaps_comp.jpg'.format(img_id))
@@ -265,6 +269,7 @@ if __name__ == '__main__':
 
         # f.write('<span>image</span>')
         f.write('<span>GT</span>')
+        f.write('<span>GT labels</span>')
         f.write('<span>GT heatmaps</span>')
         f.write('<span>Output heatmaps</span>')
         f.write('<span>Completed heatmaps</span>')
