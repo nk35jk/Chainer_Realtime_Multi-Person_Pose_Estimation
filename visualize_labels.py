@@ -135,7 +135,7 @@ if __name__ == '__main__':
         labels_to_show = data_loader.overlay_pafs(img.copy(), pafs, .4, .6)
         labels_to_show = data_loader.overlay_heatmap(labels_to_show, heatmaps[:len(JointType)].max(axis=0), .6, .4)
         labels_to_show = data_loader.overlay_ignore_mask(labels_to_show, ignore_mask, .5, .5)
-        cv2.imwrite(os.path.join(output_dir, '{:08d}_labels_gt.jpg'.format(img_id)), heatmaps_to_show)
+        cv2.imwrite(os.path.join(output_dir, '{:08d}_labels_gt.jpg'.format(img_id)), labels_to_show)
 
         """GT joints"""
         gt_img = img.copy()
