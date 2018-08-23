@@ -86,7 +86,7 @@ if __name__ == '__main__':
         ignore_mask = cv2.resize(ignore_mask.astype(np.uint8)*255, shape) > 0
 
         """inference"""
-        poses, scores = pose_detector(img)
+        poses_, scores = pose_detector(img)
 
         """label completion"""
         xp = cuda.get_array_module(pose_detector.pafs)
