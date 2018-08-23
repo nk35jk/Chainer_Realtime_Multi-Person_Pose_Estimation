@@ -96,7 +96,7 @@ if __name__ == '__main__':
     f = open(os.path.join(output_dir, 'visualization.html'), 'w')
     f.write('<head><link rel="stylesheet" type="text/css" href="style.css"></head>')
 
-    for img_id in img_ids[1000:]:
+    for img_id in img_ids[:1000]:
     # for i in range(len(data_loader)):
 
         """Save ground truth labels"""
