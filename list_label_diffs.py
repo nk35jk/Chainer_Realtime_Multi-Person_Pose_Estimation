@@ -109,9 +109,9 @@ if __name__ == '__main__':
 
         """append results"""
         img_ids_.append(img_id)
-        heatmap_diff = (((comp_heatmaps_t[:-1] - heatmaps[:-1])**2)**.5).mean()
+        heatmap_diff = (((comp_heatmaps_t[:-1] - heatmaps[:-1])**2)**.5).mean() / len(annotations)
         heatmap_diffs.append(heatmap_diff)
-        paf_diff = (((comp_pafs_t - pafs)**2)**.5).mean()
+        paf_diff = (((comp_pafs_t - pafs)**2)**.5).mean() / len(annotations)
         paf_diffs.append(paf_diff)
 
     """save results"""

@@ -37,7 +37,7 @@ def parse_args():
                         help='number of stages of posenet')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--out', '-o', default='result/heatmap')
+    parser.add_argument('--out', '-o', default='result/paf')
     args = parser.parse_args()
     params['inference_img_size'] = params['archs'][args.arch].insize
     params['downscale'] = params['archs'][args.arch].downscale
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     # img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
     #            62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]
 
-    path = 'result/visualization/heatmap_img_list.txt'
+    path = 'result/visualization/paf_img_list.txt'
     img_ids = list(map(int, (open(path).read().split())))
 
     output_dir = args.out
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     f = open(os.path.join(output_dir, 'visualization.html'), 'w')
     f.write('<head><link rel="stylesheet" type="text/css" href="style.css"></head>')
 
-    for img_id in img_ids[:1000]:
+    for img_id in img_ids[1000:]:
     # for i in range(len(data_loader)):
 
         """Save ground truth labels"""

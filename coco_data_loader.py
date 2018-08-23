@@ -522,7 +522,7 @@ class CocoDataLoader(DatasetMixin):
 
         heatmaps = self.gen_heatmaps(img, poses, scales, params['heatmap_sigma'])
         pafs = self.gen_pafs(img, poses, scales, params['paf_sigma'])
-        ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
+        # ignore_mask = cv2.morphologyEx(ignore_mask.astype('uint8'), cv2.MORPH_DILATE, np.ones((16, 16))).astype('bool')
 
         if self.stride != 1:
             y, x = ignore_mask.shape
