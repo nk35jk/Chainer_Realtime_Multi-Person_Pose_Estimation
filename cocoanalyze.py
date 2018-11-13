@@ -1264,16 +1264,17 @@ class COCOanalyze:
         if self.params.check_kpts:
             for err in self.params.err_types:
                 if err == 'miss':
-                    err_labels.append('w/o Miss')
-                    colors_vec.append('#F2E394')
+                    err_labels.append('Loc')
+                    # colors_vec.append('#F2E394')
+                    colors_vec.append('#5982b8')
                 if err == 'swap':
-                    err_labels.append('w/o Swap')
+                    err_labels.append('Swap')
                     colors_vec.append('#F2AE72')
                 if err == 'inversion':
-                    err_labels.append('w/o Inv.')
+                    err_labels.append('Inv.')
                     colors_vec.append('#D96459')
                 if err == 'jitter':
-                    err_labels.append('w/o Jit.')
+                    err_labels.append('Jit.')
                     colors_vec.append('#8C4646')
 
         if self.params.check_scores:
@@ -1281,8 +1282,9 @@ class COCOanalyze:
             colors_vec += ['#4F82BD']
 
         if self.params.check_bckgd:
-            err_labels += ['w/o Bkg. FP', 'w/o FN']
-            colors_vec += ['#8063A3','seagreen']
+            err_labels += ['Bkg. FP', 'FN']
+            # colors_vec += ['#8063A3','seagreen']
+            colors_vec += ['#8063A3','#f29d38']
 
         if makeplots:
             self._plot(self.cocoEval.params.recThrs[:], ps_mat,
@@ -1483,7 +1485,7 @@ class COCOanalyze:
         catId      = 0
 
         if err_labels:
-            labels = ['Orig. Dts.'] + err_labels
+            labels = ['OKS 50'] + err_labels
             colors = list(Color("white").range_to(Color("seagreen"),len(labels)))
             colors[-len(err_labels):] = \
                 [Color(c) for c in color_vec]
@@ -1507,6 +1509,26 @@ class COCOanalyze:
                         # plt.title('oksThrs:[{}], areaRng:[{}], maxDets:[{}]'.format(t,a,m),fontsize=18)
                         thresh_idx = [tind + i * len(iouThrs) for i in range(len(labels))]
                         oks_ps_mat = ps_mat[thresh_idx,:,:,:,:]
+
+                    """"""
+                    precisions = ps_mat[0,:,catId,aind,mind]
+                    plt.plot(recalls,precisions,c='k',ls='-',lw=2)
+                    m_map = np.mean(precisions[precisions>-1])
+                    if len(precisions[precisions>-1])==0: m_map=.0
+                    interm_m_map = '%.3f'%m_map
+                    m_map_val_str = interm_m_map[1-int(interm_m_map[0]):5-int(interm_m_map[0])]
+
+                    if err_labels:
+                        the_label = '{:<11}: {}'.format('OKS 75',m_map_val_str)
+                    else:
+                        the_label = '{:<7}: {}'.format('OKS 75',m_map_val_str)
+
+                    patch = mpatches.Patch(facecolor='white',
+                                           edgecolor='k',
+                                           linewidth=1.5,
+                                           label=the_label)
+                    legend_patches.append(patch)
+                    """"""
 
                     for lind, l in enumerate(labels):
                         precisions = oks_ps_mat[lind,:,catId,aind,mind]

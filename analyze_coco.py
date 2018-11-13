@@ -52,7 +52,7 @@ def evaluate():
                                  'annotations/person_keypoints_val2017.json'))
     if args.res:
         res = json.load(open(args.res))
-        imgIds = [x['image_id'] for x in res]
+        imgIds = list(set([x['image_id'] for x in res]))
     else:
         pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu,
                                      precise=args.fast, stages=args.stages)
@@ -123,7 +123,7 @@ def evaluate():
     # note: different order will show different progressive improvement
     # to study impact of single error type, study in isolation
     coco_analyze.params.err_types = ['miss', 'swap' , 'inversion', 'jitter']
-    # coco_analyze.params.err_types = ['jitter']
+    coco_analyze.params.err_types = ['miss']
 
     # area ranges for evaluation
     # 'all' range is union of medium and large
