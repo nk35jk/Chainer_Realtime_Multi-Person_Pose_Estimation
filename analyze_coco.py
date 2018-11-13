@@ -120,7 +120,7 @@ def evaluate():
     coco_analyze.params.maxDets = [20]
 
     coco_analyze.analyze(check_kpts=True, check_scores=True, check_bckgd=True)
-    coco_analyze.summarize(makeplots=True, save_dir=os.path.dirname(args.weights))
+    coco_analyze.summarize(makeplots=True, savedir=os.path.dirname(args.weights))
 
     path = os.path.join(os.path.dirname(args.weights), 'evaluation_results.txt')
     with open(path, 'a') as f:
