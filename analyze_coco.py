@@ -121,8 +121,9 @@ def evaluate():
 
     coco_analyze.analyze(check_kpts=True, check_scores=True, check_bckgd=True)
     coco_analyze.summarize(makeplots=True)
+    plt.savefig(os.path.join(os.path.dirname(args.weights), 'analysis_result.txt'))
 
-    path = '{}/evaluation_results.txt'.format(os.path.dirname(args.weights))
+    path = os.path.join(os.path.dirname(args.weights), 'evaluation_results.txt')
     with open(path, 'a') as f:
         f.write('{}, {}\n'.format(args.weights, ap))
 
