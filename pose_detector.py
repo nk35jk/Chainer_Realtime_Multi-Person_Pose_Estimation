@@ -571,7 +571,7 @@ class PoseDetector(object):
             self.heatmaps = self.heatmaps.get()
         if len(all_peaks) == 0:
             return np.empty((0, len(JointType), 3)), np.empty(0)
-        all_connections = self.compute_connections(pafs, all_peaks, map_w, params)
+        all_connections = self.compute_connections(self.pafs, all_peaks, map_w, params)
         subsets = self.grouping_key_points(all_connections, all_peaks, params)
         all_peaks[:, 1] *= orig_img_w / map_w
         all_peaks[:, 2] *= orig_img_h / map_h

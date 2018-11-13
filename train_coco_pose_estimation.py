@@ -1,5 +1,4 @@
 import os
-import cv2
 import copy
 import json
 import glob
@@ -7,8 +6,14 @@ import random
 import argparse
 import datetime
 import subprocess
-import numpy as np
 import multiprocessing
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+import cv2
+import numpy as np
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -24,10 +29,6 @@ from coco_data_loader import CocoDataLoader
 from pose_detector import PoseDetector, draw_person_pose
 
 from models import posenet, nn1
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 
 def compute_loss(imgs, pafs_ys, heatmaps_ys, pafs_t, heatmaps_t,

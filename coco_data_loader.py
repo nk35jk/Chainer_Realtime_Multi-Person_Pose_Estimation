@@ -1,19 +1,17 @@
 import os
 import sys
-import cv2
 import math
 import random
+
+import cv2
 import numpy as np
 from scipy.io import loadmat
+import matplotlib.pyplot as plt
 
 from chainer.dataset import DatasetMixin
 from pycocotools.coco import COCO
 
 from entity import JointType, params
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 
 class CocoDataLoader(DatasetMixin):

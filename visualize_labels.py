@@ -52,11 +52,11 @@ if __name__ == '__main__':
     # trainのGTのラベルが適切でないもの
     # img_ids = [326, 395, 459]
     # valのGTのラベルが適切でないもの
-    # img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
-    #            62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]
+    img_ids = [1296, 4395, 11051, 16598, 18193, 48564, 50811, 58705, 60507,
+               62808, 66771, 70739, 84031, 84674, 93437, 131444, 143572]
 
-    path = 'result/visualization/paf_img_list.txt'
-    img_ids = list(map(int, (open(path).read().split())))
+    # path = 'result/visualization/paf_img_list.txt'
+    # img_ids = list(map(int, (open(path).read().split())))
 
     output_dir = args.out
     if not os.path.exists(output_dir):
@@ -69,8 +69,8 @@ if __name__ == '__main__':
                                  mode=mode, augment_data=False,
                                  resize_data=False, use_line_paf=False)
 
-    pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu,
-                                 precise=True, stages=args.stages)
+    # pose_detector = PoseDetector(args.arch, args.weights, device=args.gpu,
+    #                              precise=True, stages=args.stages)
 
     # save css file
     with open(os.path.join(output_dir, 'style.css'), 'w') as f:
@@ -132,10 +132,14 @@ if __name__ == '__main__':
         heatmaps_to_show = data_loader.overlay_heatmaps(img.copy(), heatmaps[:len(JointType)], .25, .75)
         heatmaps_to_show = data_loader.overlay_ignore_mask(heatmaps_to_show, ignore_mask, .5, .5)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_heatmaps_gt.jpg'.format(img_id)), heatmaps_to_show)
-        labels_to_show = data_loader.overlay_pafs(img.copy(), pafs, .4, .6)
-        labels_to_show = data_loader.overlay_heatmap(labels_to_show, heatmaps[:len(JointType)].max(axis=0), .6, .4)
-        labels_to_show = data_loader.overlay_ignore_mask(labels_to_show, ignore_mask, .5, .5)
+        labels_to_show = data_loader.overlay_pafs(img.copy(), pafs, .25, .75)
+        labels_to_show = data_loader.overlay_heatmap(labels_to_show, heatmaps[:len(JointType)].max(axis=0), .55, .45)
+        # labels_to_show = data_loader.overlay_heatmap(img.copy(), heatmaps[:len(JointType)].max(axis=0), .3, .7)
+        # labels_to_show = data_loader.overlay_pafs(labels_to_show, pafs, .6, .4)
+        # labels_to_show = data_loader.overlay_ignore_mask(labels_to_show, ignore_mask, .5, .5)
         cv2.imwrite(os.path.join(output_dir, '{:08d}_labels_gt.jpg'.format(img_id)), labels_to_show)
+
+        break
 
         """GT joints"""
         gt_img = img.copy()
