@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from coco_data_loader import CocoDataLoader
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-from pycocotools.cocoanalyze import COCOanalyze
+# from pycocotools.cocoanalyze import COCOanalyze
 from cocoanalyze import COCOanalyze
 
 from entity import JointType, params
