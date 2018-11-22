@@ -6,8 +6,8 @@ import time
 import copy
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-plt.rcParams['xtick.labelsize'] = 16
-plt.rcParams['ytick.labelsize'] = 16
+plt.rcParams['xtick.labelsize'] = 20
+plt.rcParams['ytick.labelsize'] = 20
 plt.rcParams['font.family']     = 'monospace'
 from colour import Color
 
@@ -1264,7 +1264,7 @@ class COCOanalyze:
         if self.params.check_kpts:
             for err in self.params.err_types:
                 if err == 'miss':
-                    err_labels.append('Loc')
+                    err_labels.append('w/o Loc')
                     # colors_vec.append('#F2E394')
                     colors_vec.append('#5982b8')
                 if err == 'swap':
@@ -1282,7 +1282,7 @@ class COCOanalyze:
             colors_vec += ['#4F82BD']
 
         if self.params.check_bckgd:
-            err_labels += ['Bkg. FP', 'FN']
+            err_labels += ['w/o Bkg. FP', 'w/o FN']
             # colors_vec += ['#8063A3','seagreen']
             colors_vec += ['#8063A3','#f29d38']
 
@@ -1496,7 +1496,7 @@ class COCOanalyze:
         for aind, a in enumerate(areaRngLbl):
             for mind, m in enumerate(maxDets):
                 if not err_labels:
-                    fig=plt.figure(figsize=(10,8))
+                    fig=plt.figure(figsize=(14, 8))
                     ax = fig.add_axes([0.1, 0.15, 0.56, 0.7])
                     # plt.title('areaRng:[{}], maxDets:[{}]'.format(a,m),fontsize=18)
                     oks_ps_mat = ps_mat
@@ -1504,8 +1504,9 @@ class COCOanalyze:
                 for tind, t in enumerate(iouThrs):
                     legend_patches = []
                     if err_labels:
-                        fig=plt.figure(figsize=(10,8))
-                        ax = fig.add_axes([0.1, 0.15, 0.56, 0.7])
+                        fig=plt.figure(figsize=(10, 8))
+                        # ax = fig.add_axes([0.1, 0.15, 0.56, 0.7])
+                        ax = fig.add_axes([0.1, 0.15, 0.76, 0.7])
                         # plt.title('oksThrs:[{}], areaRng:[{}], maxDets:[{}]'.format(t,a,m),fontsize=18)
                         thresh_idx = [tind + i * len(iouThrs) for i in range(len(labels))]
                         oks_ps_mat = ps_mat[thresh_idx,:,:,:,:]
@@ -1558,13 +1559,13 @@ class COCOanalyze:
                         legend_patches.append(patch)
 
                     plt.xlim([0,1]); plt.ylim([0,1]); plt.grid()
-                    plt.xlabel('recall',fontsize=18); plt.ylabel('precision',fontsize=18)
+                    plt.xlabel('recall',fontsize=22); plt.ylabel('precision',fontsize=22)
                     # lgd = plt.legend(handles=legend_patches[::-1], ncol=1,
                     #              bbox_to_anchor=(1, 1), loc='upper left',
                     #              fancybox=False, shadow=False, fontsize=18)
                     lgd = plt.legend(handles=legend_patches[::-1], ncol=1,
                                  loc='lower left',
-                                 fancybox=False, shadow=False, fontsize=16)
+                                 fancybox=False, shadow=False, fontsize=22)
 
                     if savedir == None:
                         plt.show()
@@ -1572,6 +1573,7 @@ class COCOanalyze:
                         prefix   = 'error_prc' if err_labels else 'prc'
                         oks_str  = '[%s]'%(int(100*t)) if err_labels else ''
                         savepath = '{}/{}_[{}]{}[{}][{}].pdf'.format(savedir,prefix,team_name,oks_str,a,m)
+                        # plt.show()  # TODO: delete
                         plt.savefig(savepath,bbox_inches='tight')
                         plt.close()
 
